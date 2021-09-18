@@ -1,0 +1,109 @@
+---
+title: "Text Mining Rush Lyrics"
+subtitle: "Section 2: Exploration"
+author: "Michael Foley"
+date: "`r Sys.Date()`"
+output: 
+  html_document:
+    css: "style.css"
+    theme: flatly
+    toc: true
+    toc_float: true
+    highlight: haddock
+    code_folding: hide
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r message=FALSE, warning=FALSE, include=FALSE}
+library(tidyverse)
+library(tidytext)
+library(plotly)
+library(glue)
+
+lyrics <- readRDS("./1_lyrics.Rds")
+lyrics_lines <- readRDS("./1_lyrics_lines.Rds")
+
+palette <- c("cool_gray" = "#3B3730", "sage" = "#9D9480", "nude" = "#8C7460")
+```
+
+This exploration of the lyrics is to get acquainted with the data set and perform any transformations that will likely be useful in subsequent analysis.
+
+## Summary Statistics
+
+
+
+```{r}
+lyrics %>% 
+  count(released, album) %>%
+  mutate(released = if_else(album == "Fly by Night", as.integer(1974), released)) %>%
+  ggplot(aes(x = released, y = n)) +
+  geom_col(fill = "firebrick") +
+  geom_text(aes(label = album, y = 0.5), angle = 90, hjust = "bottom", vjust = .25, 
+            size = 3, color = "gray99") +
+  scale_x_continuous(limits = c(1970, 2015), 
+                     breaks = seq(1970, 2015, by = 5), 
+                     minor_breaks = 1970:2015, 
+                     expand = c(0,0)) +
+  theme_light() +
+  theme(
+    axis.text.x = element_text(angle = 90, vjust = 0.5)
+  ) +
+  labs(x = "Release Year", y = "Songs on Album", 
+       title = glue("Neil Peart authored lyrics to {nrow(lyrics)} songs across {n_distinct(lyrics$album)} albums."),
+       subtitle = "Song Counts")
+```
+
+## Text Complexity
+
+Have Rush songs changed in _complexity_ over time? I Googled "measuring text complexity" to see how I might characterize songs. [Lexile](https://lexile.com/educators/tools-to-support-reading-at-school/tools-to-determine-a-books-complexity/) has an algorithm that measures text complexity for educators. Lexile doesn't disclose their algorithm, but they do give some direction about how to think about complexity. Their measure of complexity increases with sentence length and decreases with word frequency. 
+
+"Sentence length" is a tricky concept for song lyrics since they mostly exclude punctuation. The next best alternative may be to measure the length of the entire song. We can also divide the text into common (so-called "stop words") and complex words and count each type. A song with a high proportion of complex words could receive a higher complexity score. A variation that measures the proportion of distinct words that are complex might prove useful to mitigate the effect of repetitive choruses.
+
+```{r}
+lyrics
+```
+
+
+The average song^[Good tutorial on **ggplotly** [here](https://www.musgraveanalytics.com/blog/2018/8/24/how-to-make-ggplot2-charts-interactive-with-plotly).].
+
+```{r}
+song_word_counts <- lyrics %>% 
+  unnest_tokens(output = "word", input = "lyrics", token = "words") %>%
+  count(song_id, word) %>%
+  group_by(song_id) %>%
+  summarize(word_count = sum(n))
+
+lyrics_aug_0 <- lyrics %>%
+  inner_join(song_word_counts, by = "song_id")
+
+p <- lyrics_aug_0 %>% 
+  ggplot(aes(x = released, y = word_count, group = 1,
+             text = glue("{song} ({song_id})<br>",
+                         "Album: {album}<br>",
+                         "Released: {released}<br>",
+                         "Words: {word_count}"))) +
+  geom_point(color = "firebrick4") +
+  geom_smooth(method = "lm", formula = "y ~ x", color = "goldenrod", fill = "goldenrod") +
+  labs(y = "Words in Song", x = "Release Year", 
+       title = "Word counts in songs were consistent over time.",
+       subtitle = "Linear trend line has zero slope.") +
+  theme_light()
+
+ggplotly(p, tooltip = "text")
+```
+
+## Lexicon
+
+Did Rush songs become 
+```{r}
+lyrics %>% 
+  unnest_tokens(output = "word", input = "lyrics", token = "words") %>%
+  anti_join(stop_words, by = "word") %>%
+  count(album, word) %>%
+  group_by(album) %>%
+  slice_max(order_by = n, n = 5, with_ties = FALSE)
+```
+

@@ -1,18 +1,23 @@
 # rush-lyrics
- Using NLP to analyze Neil Peart's Rush lyrics
+Using NLP to analyze Neil Peart's Rush lyrics.
 
+## What the project does
+
+This project uses natural language processing to explore Neil Peart's lyrics for the rock band, Rush.
+
+## Why the project is useful
+
+
+
+## How users can get started with the project
+## Where users can get help with your project
+## Who maintains and contributes to the project
 
 
 ## Using the Genius API
 
 https://towardsdatascience.com/song-lyrics-genius-api-dcc2819c29
 
-APP NAME: lyric_mining
-APP WEBSITE URL: https://github.com/mpfoley73
-
-CLIENT IT: KDmwVLnlxmpFmmN2wZ7m4k11hoeyUd9I3l5jkSQVBRwDHixULWQFzvHdYtpfs_Sx
-CLIENT SECRET: k504akQcOBNs-OjMHuhqW6AQx2x59rV-844RZhkZ2x_z5MgVLqd6szynJHr8B26MWBr1DTNWX5HVzpHMvOFeLQ
-CLIENT ACCESS TOKEN: j6tEPd6PGYEKBAOwawGtRb0SPlLQk7P-fKJ8-xIIOl0Tr5JthSvF6mpt9sNWV6r9
 
 ## Using an API with R
 

@@ -1,0 +1,271 @@
+---
+title: "Text Mining Rush Lyrics"
+subtitle: "Section 1: Get Lyrics"
+author: "Michael Foley"
+date: "`r Sys.Date()`"
+output: 
+  html_document:
+    css: "style.css"
+    theme: flatly
+    toc: true
+    toc_float: true
+    highlight: haddock
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r include=FALSE}
+pacman::p_load(tidyverse, geniusr, rvest, lubridate, httr, jsonlite, glue)
+```
+
+I searched Google for song lyrics downloads, preferably via some API. The best option I found was the website [Genius](https://genius.com/). On Genius, users post lyrics and commentary (annotations). Genius offers an API ([documentation](https://docs.genius.com/)) through which you can pull song metadata, but not the lyrics directly. There are at least three R packages (**genius**, **geniusr**, and **rgenius**) that use the API, but I did not have complete success with any of them. **genius** is no longer on CRAN and [notes](https://github.com/JosiahParry/genius/issues/63) indicate the web site changes to frequently to build a reliable package. 
+
+I've decided to use none of the packages directly, but peak into their source code to learn how to use an API and how to web-scrape. This report is a step-by-step work log, sort of like a tutorial. The output of this script is a data frame with one row per song and columns for the song identifier, some basic metadata about the song (album name, release date), and the lyrics in a single character field.
+
+## The Genius API
+
+To use the Genius API you need to register you client with Genius. Registration identifies yourself and presumably gives the API a contact to complain to if the API is abused. I followed the step-by-step guide in [Ekene A.'s blog post](https://towardsdatascience.com/song-lyrics-genius-api-dcc2819c29) on **towards data science**. Here are the highlights.
+
+1. Go to https://genius.com/api-clients and click "New API Client". Genius asks for several items, but you only need to provide an app name and url. My app is just this project, so I used my github account and repo account.
+
+![](./media/genius_new_api.png)
+
+2. After saving, Genius returned the a page with my client ID, secret, and a link for the access token.
+
+![](./media/genius_api_client.png)
+
+As far as I can tell, there is nothing you need to do with either the client ID or secret - it's the access token that you pass to the API to get results. You should assign this access token string to a character variable in your program that you can pass to the API for each request. Since you probably don't want to hard code your token for everyone to see if they read your code, set the value in your .Renviron file. In my console, I entered
+
+```{r eval=FALSE}
+# (not run)
+Sys.setenv(GENIUS_API_TOKEN = "I pasted my access token text here")
+```
+
+Now I can just get the environment variable when I run the code.
+
+```{r}
+genius_api_token <- Sys.getenv("GENIUS_API_TOKEN")
+```
+
+## Identify Song URLs with Genius API
+
+I will use the Genius API to pull the page URLs for all Rush songs. The API will return the URLs for a particular artist id, so my first task is to identify Rush's artist id. 
+
+### Rush Artist ID
+
+`geniusr::search_artist()` pulls artist ids, but I want to peak under its hood to learn how to interface with an API. `search_artist()` uses **httr** functions `GET()` and `content()` then sequences through the result set list, but `jsonlite::fromJSON()` is a bit more compact.
+
+```{r}
+base_url <- "https://api.genius.com"
+
+search_url <- glue("{base_url}/search?q=Rush&per_page=50&access_token={genius_api_token}")
+
+search_result <- fromJSON(search_url, flatten = TRUE)
+
+search_result$response$hits %>%
+  select(result.primary_artist.id, result.primary_artist.name)
+```
+
+Aha! Rush is id 4384
+
+```{r}
+rush_id <- 4384
+```
+
+
+### Rush's Song URLs
+
+Here I could use `geniusr::get_artist_songs_df(artist_id = rush_id)` to get all songs attached to `rush_id`, but I'll keep going the hard way. The code below is a bare-bones deconstruction of **geniusr**. Again, I'm using `fromJSON` instead of `GET()` and `content()`.
+
+The code below requests songs from artist_id `r rush_id`. Genius returns a page of results per request, so you have to request each page individually (the `while()` loop). Each page is a list object and the search hits are list objects within with the list, so you have to loop through the page list and pluck the search hit list items (the `lapply()` function).
+
+```{r}
+# song_list will be a list of data frames, one data frame per search result page.
+song_list <- list()
+
+# Assume at least 1 page of results (I know, not robust). My search returned 25
+# pages. The while loop exits when the `next_page` variable is null, but caps at
+# 100 pages just as a guard-rail.
+page_num <- 1
+while (page_num < 100) {
+  search_url <- glue("{base_url}/artists/{rush_id}/songs?page={page_num}&access_token={genius_api_token}")
+  search_result <- fromJSON(search_url, flatten = TRUE)
+  song_list[[page_num]] <- search_result$response$songs
+  page_num <- search_result$response$next_page
+  if (is.null(page_num)) {
+    break
+  }
+}
+songs_0 <- bind_rows(song_list) %>%
+  select(song_id = id, song = title_with_featured, song_url = url)
+
+head(songs_0)
+```
+
+Looking great! Data frame `songs_0` has `r nrow(songs_0)` rows though - almost three times as many songs as Rush actually composed. The problem is it includes live albums and a few duplicates (slightly different names). I also want to filter out instrumentals since this is a lyrics analysis, and songs from their 1974 debut album because Neil Peart wasn't in the band yet.
+
+```{r}
+songs <- songs_0 %>%
+  # Exclude live
+  filter(!str_detect(song, paste0("(live)|(Live)|(R30)|(Rush In Rio)|",
+                                       "(All the World’s a Stage)|(Clockwork Angels)|",
+                                       "(Chronicles)|(Exit...Stage Left)|",
+                                       "(Time Machine)|(remastered)|",
+                                       "(A Show of Hands)"))) %>%
+  filter(!song_id %in% c(1834440, 1934285, 2247220, 2122045, 2054346, 1365829,
+                         2127649, 6850090, 1315730, 1354524, 1845007, 1622237,
+                         1125127, 3914681, 2190473, 4429804, 3914682, 1974154,
+                         2117239, 1818469)) %>%
+  # Exclude instrumentals
+  filter(!song_id %in% c(2216531, 4433029, 3155443, 1521243, 2196014, 943295,
+                         3154378, 1318395, 3155448, 1631355, 142069, 3155442,
+                         1718279, 3154336, 3154377, 3154317, 3155445, 3155451,
+                         276075)) %>%
+  # Exclude covers
+  filter(!song_id %in% c(401257, 401252, 401250, 401256, 401258, 401253,
+                         274121, 401251)) %>%
+  # Exclude the Rush 1974 album (pre-Neil Peart)
+  filter(!song_id %in% c(224737, 224752, 224744, 224750, 224738, 224753, 224748,
+                         224740)) %>%
+  # Exclude other odd-balls
+  filter(!song_id %in% c(1559832, 3695386, 1465765, 401323, 4433004, 4432946,
+                         4431337)) %>%
+  # Some songs feature Rush
+  filter(str_detect(song_url, "^https://genius.com/Rush")) %>%
+  # Manually override a few song names to match the ones in Wikipedia (later)
+  mutate(song = case_when(
+    song == "Anagram (For Mongo)" ~ "Anagram",
+    song == "Beneath, Between and Behind" ~ "Beneath, Between, and Behind",
+    song == "Cygnus X-1, Book II: Hemispheres" ~ "Cygnus X-1 Book II: Hemispheres",
+    song == "La Villa Strangiato (An Exercise in Self-Indulgence)" ~ "La Villa Strangiato",
+    song == "The Larger Bowl (A Pantoum)" ~ "The Larger Bowl",
+    TRUE ~ song
+  )
+)
+
+songs$song
+```
+
+`songs` has `r nrow(songs)` rows. That seems about right. Now I need to extract the lyrics from each song's web page.
+
+## Web-Scrape Song Lyrics
+
+I'll download each web page and extract the lyrics into a data frame column. For this task, I am relying on the [genius::genius_url()](https://github.com/JosiahParry/genius/blob/master/R/genius_url.R) function code, with just a few tweaks to get it to work for me. This step takes a few minutes, so I wrote the results to a file to avoid burdening the Genius API.
+
+```{r}
+if (file.exists("./1_lyrics_raw.Rds")) {
+  lyrics_raw <- readRDS("./1_lyrics_raw.Rds")
+} else {
+  lyrics_raw <- songs %>%
+    mutate(
+      genius_session = map(song_url, rvest::session),
+      class_names = map(genius_session, function(x) {
+        x %>%
+          rvest::html_elements("div") %>%
+          rvest::html_children() %>%
+          rvest::html_attr("class") %>%
+          unique() %>%
+          stats::na.omit() %>%
+          stringr::str_split("[:space:]") %>%
+          unlist()
+      }),
+      lyrics_class = map_chr(class_names, ~ .[str_detect(., "Lyrics__Container")]),
+      lyrics_node = map2(genius_session, lyrics_class, ~ html_node(.x, paste0(".", .y))),
+      lyrics = map_chr(lyrics_node, ~ html_text2(.))
+    ) %>%
+    select(-c(genius_session, class_names, lyrics_class, lyrics_node))
+  saveRDS(lyrics_raw, "./1_lyrics_raw.Rds")
+}
+
+head(lyrics_raw, 1)
+```
+
+The lyrics text includes new line characters, and brackets with annotation (e.g., "[Verse 1]"). Let's clean as best we can. One awkward problem I noticed is that _annotated lyrics_ (lyrics where a Genius user adds commentary) are missing the newlines when read from `html_text2()`. E.g., "Line one<br>Line two" is stored as "Line oneLine two". I'll fix this by prefixing a newline character "\n" to any capital letter preceded by anything other than a newline or space.
+
+```{r}
+# regex for capital letters, and a function to prefix a space to them
+cap_regex <- paste0("[", paste0(LETTERS, collapse=""), "]")
+prefix_space <- function(x) { paste0(" ", x) }
+
+# to replace [non-space][capital] with [non-space]\n[capital]
+cap_regex <- "[^\\s][A-Z]"
+prefix_space <- function(x) { paste0(str_sub(x, 1, 1), "\n", str_sub(x, 2, 2)) }
+
+lyrics_1 <- lyrics_raw %>%
+  mutate(
+    # remove bracketed text
+    lyrics = str_remove_all(lyrics, "\\[[a-zA-Z0-9\\s:\\.-]*\\]"),
+    # keep new line chars, but only one. Run twice in case there are more than 2.
+    lyrics = str_replace_all(lyrics, "\n\n", "\n"),
+    lyrics = str_replace_all(lyrics, "\n\n", "\n"),
+    # replace [non-space][capital] with [non-space]\n[capital]
+    lyrics = str_replace_all(lyrics, cap_regex, prefix_space),
+    # remove quotations markes
+    lyrics = str_remove_all(lyrics, '\\"'),
+    # trim whitespace
+    lyrics = str_trim(lyrics, side = "both")
+  )
+
+head(lyrics_1, 1)
+```
+
+## Album Names
+
+I didn't find a good way to pull the album name from Genius, so I'll scrape it from Wikipedia instead.
+
+```{r}
+wiki_xml <- read_html("https://en.wikipedia.org/wiki/List_of_songs_recorded_by_Rush")
+
+song_albums <- wiki_xml %>% 
+  html_elements("table") %>% .[[1]] %>% 
+  html_table() %>%
+  mutate(
+    Song = str_remove_all(Song, "\""),
+    Album = str_trim(Album, side = "both"),
+    Album = if_else(Album == "Fly By Night", "Fly by Night", Album)
+  ) %>%
+  select(song = Song, album = Album, released = Year)
+
+head(song_albums)
+```
+
+Attach the album to the lyrics data frame.
+
+```{r}
+lyrics_2 <- lyrics_1 %>%
+  left_join(song_albums, by = "song") %>%
+  select(everything(), -lyrics, lyrics)
+
+head(lyrics_2, 1)
+```
+
+## Long Form
+
+It may be helpful to have two versions of the text: one treating the song lyrics as a single block of text; another treating each line separately. I'll split the lyrics into lines in one data frame, then remove the newline characters from the orginal.
+
+```{r}
+lyrics_lines <- lyrics_2 %>%
+  mutate(lyrics = str_split(lyrics, "\\n")) %>%
+  unnest(lyrics) %>%
+  group_by(song_id) %>%
+  mutate(line_no = row_number()) %>%
+  ungroup() %>%
+  select(song_id, line_no, lyrics)
+
+lyrics <- lyrics_2 %>%
+  mutate(lyrics = str_replace_all(lyrics, "\\n", " "))
+
+lyrics %>% filter(song_id == 78816)
+lyrics_lines %>% filter(song_id == 78816)
+```
+
+## Save Work
+
+Save the lyrics to data frames for subsequent steps.
+
+```{r}
+saveRDS(lyrics, "./1_lyrics.Rds")
+saveRDS(lyrics_lines, "./1_lyrics_lines.Rds")
+```
