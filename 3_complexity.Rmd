@@ -1,5 +1,5 @@
 ---
-title: "Text Mining Rush Lyrics"
+title: "Battle of the Bands: Text Mining Lyrics from Queen, Rush, and AC/DC"
 subtitle: "Section 3: Text Complexity"
 author: "Michael Foley"
 date: "`r Sys.Date()`"
@@ -10,7 +10,7 @@ output:
     toc: true
     toc_float: true
     highlight: haddock
-    code_folding: hide
+    code_folding: show
 ---
 
 ```{r setup, include=FALSE}
@@ -22,58 +22,70 @@ library(tidyverse)
 library(tidytext)
 library(plotly)
 library(glue)
+library(textstem)
 
-lyrics <- readRDS("./lyrics.Rds")
-
-palette <- c("cool_gray" = "#3B3730", "sage" = "#9D9480", "nude" = "#8C7460")
+lyrics <- readRDS("./2_lyrics.Rds")
+lyrics_lines <- readRDS("./1_lyrics_lines.Rds")
 ```
 
-Have Rush songs changed in _complexity_ over time? I Googled "measuring text complexity" to see how I might characterize songs. [Lexile](https://lexile.com/educators/tools-to-support-reading-at-school/tools-to-determine-a-books-complexity/) has an algorithm that measures text complexity for educators. Lexile doesn't disclose their algorithm, but they do give some direction about how to think about complexity. Their measure of complexity increases with sentence length and decreases with word frequency. 
+## Background
 
-"Sentence length" is a tricky concept for song lyrics since they mostly exclude punctuation. The next best alternative may be to measure the length of the entire song. We can also divide the text into common (so-called "stop words") and complex words and count each type. A song with a high proportion of complex words could receive a higher complexity score. A variation that measures the proportion of distinct words that are complex might prove useful to mitigate the effect of repetitive choruses.
+A recent HBR article featured a [text analysis of employee performance evaluations](https://hbr.org/2021/04/how-one-company-worked-to-root-out-bias-from-performance-reviews?autocomplete=true) in which the researchers measured text _complexity_. Text complexity measures are used in education to evaluate a book's required reading level. In the HBR article, the researches used complexity as a measure of the rigor and thoughtfulness that went into each performance evaluation. Text 
 
-```{r}
-lyrics
+I Googled "measuring text complexity" to see if this might be an option for characterizing songs. It is! Celine Van den Rul wrote a tutorial in [Towards Data Science](https://towardsdatascience.com/linguistic-complexity-measures-for-text-nlp-e4bf664bd660) showing how to use the **quanteda** package to measure _readability_ in terms of sentence length and syllables per word, and _richness_ in terms of distinct words. Another article on the [Illinois Sate Board of Education](https://www.isbe.net/Documents/5-determining-text-complexity.pdf) site discusses text complexity more broadly, including qualitative, quantitative, and "reader and task" dimensions of complexity. I'll put aside the qualitative and "reader and task" dimensions because they are manual coding exercises that I'm not qualified (or inclined) to tackle yet. For the quantitative measures, they discuss the Flesch-Kincaid test (available in **quanteda**) which analyzes word and sentence length (longer words and sentences are more complex). They also discuss the Dale-Chall readability formula which looks at the proportion of less-familiar words. The article also discusses the Lexile framework and the Coh-Metrix report, but these two appear to be proprietary and difficult to reproduce. Maybe an option for a more in-depth analysis. This [Wikipedia](https://en.wikipedia.org/wiki/Dale%E2%80%93Chall_readability_formula) article on the Dale-Chall readability formula outlines a straight-forward formula for complexity based on the difficult word proportion, and even links to an easily downloadable list of [familiar words](https://countwordsworth.com/download/DaleChallEasyWordList.txt) to segment the lexicon. 
+
+My strategy here will be to measure the complexity of Neil Peart's lyrics. Each section below calculates a complexity measure.
+
+## Flesch-Kincaid
+
+## Dale-Chall Readability
+
+The Dale-Chall readability measure attempts to be more clever than the Flesch-Kincaid measure. In their 1948 article, *A Formula for Predicting Readability*, Edgar Dale and Jeanne Chall compiled a list of 763 words that 80% of fourth-graders were familiar with.^[See this [Wikipedia](https://en.wikipedia.org/wiki/Dale%E2%80%93Chall_readability_formula) article.] A 1995 article extended the list to 3,000 words. You can download the list [here](http://countwordsworth.com/download/DaleChallEasyWordList.txt). Let's do it!
+
+```{r message=FALSE}
+# Only download this once
+if (exists("./3_dale_chall_3k.Rds")) {
+  dalechall3k <- readRDS("./3_dale_chall_3k.Rds")
+} else {
+  dalechall3k <- readr::read_tsv(
+    url("https://countwordsworth.com/download/DaleChallEasyWordList.txt"),
+    col_names = c("word")
+  ) %>%
+    mutate(is_familiar = 1)
+  saveRDS(dalechall3k, "./3_dale_chall_3k.Rds")
+}
+
+# sample of 30 familiar words
+sample(dalechall3k$word, 30)
 ```
 
-
-The average song^[Good tutorial on **ggplotly** [here](https://www.musgraveanalytics.com/blog/2018/8/24/how-to-make-ggplot2-charts-interactive-with-plotly).].
+I'll add familiar/difficult word counts as metadata to to my lyrics data frames.
 
 ```{r}
-song_word_counts <- lyrics %>% 
+song_words <- lyrics %>% 
   unnest_tokens(output = "word", input = "lyrics", token = "words") %>%
   count(song_id, word) %>%
+  mutate(lemmatized = lemmatize_words(word))
+
+song_difficult_words <- song_words %>%
+  # left_join(dalechall3k, by = "word") %>%
+  left_join(dalechall3k, by = c("lemmatized" = "word")) %>%
+  replace_na(list(is_familiar = 0)) %>%
+  mutate(n_familiar = n * is_familiar,
+         n_difficult = n - n_familiar)
+
+song_difficult_words_smry <- song_difficult_words %>%
   group_by(song_id) %>%
-  summarize(word_count = sum(n))
+  summarize(.groups = "drop", n_difficult_words = sum(n_difficult))
 
-lyrics_aug_0 <- lyrics %>%
-  inner_join(song_word_counts, by = "song_id")
+lyrics_1 <- lyrics %>%
+  left_join(song_difficult_words_smry, by = c("song_id"))
 
-p <- lyrics_aug_0 %>% 
-  ggplot(aes(x = released, y = word_count, group = 1,
-             text = glue("{song_name} ({song_id})<br>",
-                         "Album: {album}<br>",
-                         "Released: {released}<br>",
-                         "Words: {word_count}"))) +
-  geom_point(color = palette["sage"]) +
-  geom_smooth(method = "lm", formula = "y ~ x", color = "goldenrod", fill = "goldenrod") +
-  labs(y = "Words in Song", x = "Release Year", 
-       title = "Word counts in songs were consistent over time.",
-       subtitle = "Linear trend line has zero slope.") +
-  theme_light()
+lyrics_2 <- lyrics_1 %>%
+  mutate(dale_chall = 0.1579 * (n_difficult_words / n_words * 100) + 0.0496 * (n_words / n_lines))
 
-ggplotly(p, tooltip = "text")
+lyrics_2 %>% select(song, dale_chall, lyrics) %>% arrange(desc(dale_chall))
+
 ```
 
-## Lexicon
-
-Did Rush songs become 
-```{r}
-lyrics %>% 
-  unnest_tokens(output = "word", input = "lyrics", token = "words") %>%
-  anti_join(stop_words, by = "word") %>%
-  count(album, word) %>%
-  group_by(album) %>%
-  slice_max(order_by = n, n = 5, with_ties = FALSE)
-```
 

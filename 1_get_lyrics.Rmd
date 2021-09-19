@@ -1,5 +1,5 @@
 ---
-title: "Text Mining Rush Lyrics"
+title: "A Comparative Analysis of Song Lyrics using Text Mining: Queen, Rush, and AC/DC"
 subtitle: "Section 1: Get Lyrics"
 author: "Michael Foley"
 date: "`r Sys.Date()`"
@@ -10,6 +10,7 @@ output:
     toc: true
     toc_float: true
     highlight: haddock
+    code_folding: show
 ---
 
 ```{r setup, include=FALSE}
