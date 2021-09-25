@@ -11,7 +11,7 @@
 
 <meta name="author" content="Michael Foley" />
 
-<meta name="date" content="2021-09-20" />
+<meta name="date" content="2021-09-22" />
 
 <title>Battle of the Bands: Text Mining Lyrics from Rush, Queen, and AC/DC</title>
 
@@ -344,7 +344,7 @@ div.tocify {
 <h1 class="title toc-ignore">Battle of the Bands: Text Mining Lyrics from Rush, Queen, and AC/DC</h1>
 <h3 class="subtitle">Section 1: Create Lyrics Corpus with Genius API</h3>
 <h4 class="author">Michael Foley</h4>
-<h4 class="date">2021-09-20</h4>
+<h4 class="date">2021-09-22</h4>
 
 </div>
 
@@ -391,8 +391,8 @@ div.tocify {
 ## 2                   2660932 Russ Millions &amp; Tion Wayne
 ## 3                      1177               Taylor Swift
 ## 4                    101583                    PHARAOH
-## 5                   2624487    Rusherking, KHEA &amp; Duki
-## 6                   2660932 Russ Millions &amp; Tion Wayne
+## 5                   2660932 Russ Millions &amp; Tion Wayne
+## 6                   2624487    Rusherking, KHEA &amp; Duki
 ## 7                      1985                Frank Ocean
 ## 8                     11908              Big Time Rush
 ## 9                   2660932 Russ Millions &amp; Tion Wayne
@@ -454,16 +454,18 @@ div.tocify {
 <span id="cb7-34"><a href="#cb7-34" aria-hidden="true" tabindex="-1"></a>    <span class="at">song_url =</span> url</span>
 <span id="cb7-35"><a href="#cb7-35" aria-hidden="true" tabindex="-1"></a>  ) <span class="sc">%&gt;%</span></span>
 <span id="cb7-36"><a href="#cb7-36" aria-hidden="true" tabindex="-1"></a>  <span class="co"># Some results have a different primary artist than the three I requested</span></span>
-<span id="cb7-37"><a href="#cb7-37" aria-hidden="true" tabindex="-1"></a>  <span class="fu">filter</span>(artist_id <span class="sc">%in%</span> artist_ids)</span>
-<span id="cb7-38"><a href="#cb7-38" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb7-39"><a href="#cb7-39" aria-hidden="true" tabindex="-1"></a><span class="fu">glimpse</span>(songs_0)</span></code></pre></div>
-<pre><code>## Rows: 1,242
+<span id="cb7-37"><a href="#cb7-37" aria-hidden="true" tabindex="-1"></a>  <span class="fu">filter</span>(artist_id <span class="sc">%in%</span> artist_ids) <span class="sc">%&gt;%</span> </span>
+<span id="cb7-38"><a href="#cb7-38" aria-hidden="true" tabindex="-1"></a>  <span class="co"># song id 307393 comes in twice. Enforce unique</span></span>
+<span id="cb7-39"><a href="#cb7-39" aria-hidden="true" tabindex="-1"></a>  <span class="fu">unique</span>()</span>
+<span id="cb7-40"><a href="#cb7-40" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb7-41"><a href="#cb7-41" aria-hidden="true" tabindex="-1"></a><span class="fu">glimpse</span>(songs_0)</span></code></pre></div>
+<pre><code>## Rows: 1,241
 ## Columns: 4
 ## $ artist_id &lt;int&gt; 4384, 4384, 4384, 4384, 4384, 4384, 4384, 4384, 4384, 4384, ~
 ## $ song_id   &lt;int&gt; 78816, 4338112, 5582931, 5584212, 1845007, 1622237, 1125127,~
 ## $ song      &lt;chr&gt; &quot;2112&quot;, &quot;2112 [All the World’s a Stage]&quot;, &quot;2112 [Clockwork A~
 ## $ song_url  &lt;chr&gt; &quot;https://genius.com/Rush-2112-lyrics&quot;, &quot;https://genius.com/R~</code></pre>
-<p>So far, so good, except data frame <code>songs_0</code> has 1,242 rows. Scanning the results, I can see that is a lot more than what these bands actually composed. The problem is <code>songs_0</code> includes live albums, songs mis-attributed to the bands, and a few duplicates (same song, slightly different name). There are other songs I want to remove as well. I’ll remove instrumentals (this is a lyrics analysis!). I’ll remove songs from Rush’s 1974 debut album because Neil Peart wasn’t in the band yet (Rush - Peart != Rush). I’ll remove Queen’s Flash Gordon soundtrack since it is essentially instrumentals with overlaid movie dialogue. The code chunk below is the result of a tedious row-by-row examination of the results set, visiting the Genius site with suspicious song names, or revisiting this chunk when subsequent chunks failed assumptions (e.g., the song lacked lyrics). I’m hiding the chunk for aesthetics.</p>
+<p>So far, so good, except data frame <code>songs_0</code> has 1,241 rows. Scanning the results, I can see that is a lot more than what these bands actually composed. The problem is <code>songs_0</code> includes live albums, songs mis-attributed to the bands, and a few duplicates (same song, slightly different name). There are other songs I want to remove as well. I’ll remove instrumentals (this is a lyrics analysis!). I’ll remove songs from Rush’s 1974 debut album because Neil Peart wasn’t in the band yet (Rush - Peart != Rush). I’ll remove Queen’s Flash Gordon soundtrack since it is essentially instrumentals with overlaid movie dialogue. The code chunk below is the result of a tedious row-by-row examination of the results set, visiting the Genius site with suspicious song names, or revisiting this chunk when subsequent chunks failed assumptions (e.g., the song lacked lyrics). I’m hiding the chunk for aesthetics.</p>
 <div class="sourceCode" id="cb9"><pre class="sourceCode r fold-hide"><code class="sourceCode r"><span id="cb9-1"><a href="#cb9-1" aria-hidden="true" tabindex="-1"></a>songs_1 <span class="ot">&lt;-</span> songs_0 <span class="sc">%&gt;%</span></span>
 <span id="cb9-2"><a href="#cb9-2" aria-hidden="true" tabindex="-1"></a>  <span class="co"># Exclude live</span></span>
 <span id="cb9-3"><a href="#cb9-3" aria-hidden="true" tabindex="-1"></a>  <span class="fu">filter</span>(<span class="sc">!</span><span class="fu">str_detect</span>(song, <span class="fu">paste0</span>(</span>
@@ -484,7 +486,7 @@ div.tocify {
 <span id="cb9-18"><a href="#cb9-18" aria-hidden="true" tabindex="-1"></a>    <span class="dv">2216531</span>, <span class="dv">4433029</span>, <span class="dv">3155443</span>, <span class="dv">1521243</span>, <span class="dv">2196014</span>, <span class="dv">943295</span>, <span class="dv">3154378</span>, <span class="dv">1318395</span>, </span>
 <span id="cb9-19"><a href="#cb9-19" aria-hidden="true" tabindex="-1"></a>    <span class="dv">3155448</span>, <span class="dv">1631355</span>, <span class="dv">142069</span>, <span class="dv">3155442</span>, <span class="dv">1718279</span>, <span class="dv">3154336</span>, <span class="dv">3154377</span>, <span class="dv">3154317</span>, </span>
 <span id="cb9-20"><a href="#cb9-20" aria-hidden="true" tabindex="-1"></a>    <span class="dv">3155445</span>, <span class="dv">3155451</span>, <span class="dv">276075</span>, <span class="dv">4300257</span>, <span class="dv">2238411</span>, <span class="dv">1049696</span>, <span class="dv">356595</span>, <span class="dv">3745414</span>,</span>
-<span id="cb9-21"><a href="#cb9-21" aria-hidden="true" tabindex="-1"></a>    <span class="dv">1547579</span>, <span class="dv">2857709</span>, <span class="dv">2857726</span>)) <span class="sc">%&gt;%</span></span>
+<span id="cb9-21"><a href="#cb9-21" aria-hidden="true" tabindex="-1"></a>    <span class="dv">1547579</span>, <span class="dv">2857709</span>, <span class="dv">2857726</span>, <span class="dv">384837</span>)) <span class="sc">%&gt;%</span></span>
 <span id="cb9-22"><a href="#cb9-22" aria-hidden="true" tabindex="-1"></a>  <span class="co"># Exclude covers</span></span>
 <span id="cb9-23"><a href="#cb9-23" aria-hidden="true" tabindex="-1"></a>  <span class="fu">filter</span>(<span class="sc">!</span>song_id <span class="sc">%in%</span> <span class="fu">c</span>(</span>
 <span id="cb9-24"><a href="#cb9-24" aria-hidden="true" tabindex="-1"></a>    <span class="dv">401257</span>, <span class="dv">401252</span>, <span class="dv">401250</span>, <span class="dv">401256</span>, <span class="dv">401258</span>, <span class="dv">401253</span>, <span class="dv">274121</span>, <span class="dv">401251</span>)) <span class="sc">%&gt;%</span></span>
@@ -495,30 +497,33 @@ div.tocify {
 <span id="cb9-29"><a href="#cb9-29" aria-hidden="true" tabindex="-1"></a>  <span class="fu">filter</span>(<span class="sc">!</span>song_id <span class="sc">%in%</span> <span class="fu">c</span>(</span>
 <span id="cb9-30"><a href="#cb9-30" aria-hidden="true" tabindex="-1"></a>    <span class="dv">2229372</span>, <span class="dv">1993198</span>, <span class="dv">1995570</span>, <span class="dv">2230880</span>, <span class="dv">2004862</span>, <span class="dv">311640</span>, <span class="dv">2012721</span>, <span class="dv">2252949</span>,</span>
 <span id="cb9-31"><a href="#cb9-31" aria-hidden="true" tabindex="-1"></a>    <span class="dv">1121803</span>, <span class="dv">868701</span>, <span class="dv">1999247</span>, <span class="dv">1982992</span>, <span class="dv">1634917</span>, <span class="dv">2221746</span>, <span class="dv">1254681</span>, <span class="dv">1003511</span>,</span>
-<span id="cb9-32"><a href="#cb9-32" aria-hidden="true" tabindex="-1"></a>    <span class="dv">1944922</span>)) <span class="sc">%&gt;%</span></span>
-<span id="cb9-33"><a href="#cb9-33" aria-hidden="true" tabindex="-1"></a>  <span class="co"># Exclude other odd-balls</span></span>
+<span id="cb9-32"><a href="#cb9-32" aria-hidden="true" tabindex="-1"></a>    <span class="dv">1944922</span>, <span class="dv">1950617</span>)) <span class="sc">%&gt;%</span></span>
+<span id="cb9-33"><a href="#cb9-33" aria-hidden="true" tabindex="-1"></a>  <span class="co"># Exclude B-Sides</span></span>
 <span id="cb9-34"><a href="#cb9-34" aria-hidden="true" tabindex="-1"></a>  <span class="fu">filter</span>(<span class="sc">!</span>song_id <span class="sc">%in%</span> <span class="fu">c</span>(</span>
-<span id="cb9-35"><a href="#cb9-35" aria-hidden="true" tabindex="-1"></a>    <span class="dv">1559832</span>, <span class="dv">3695386</span>, <span class="dv">1465765</span>, <span class="dv">401323</span>, <span class="dv">4433004</span>, <span class="dv">4432946</span>, <span class="dv">4431337</span>, <span class="dv">2845669</span>,</span>
-<span id="cb9-36"><a href="#cb9-36" aria-hidden="true" tabindex="-1"></a>    <span class="dv">6681876</span>, <span class="dv">6540568</span>, <span class="dv">6681876</span>, <span class="dv">4006420</span>, <span class="dv">1184464</span>, <span class="dv">1271730</span>, <span class="dv">5522634</span>, <span class="dv">2845671</span>,</span>
-<span id="cb9-37"><a href="#cb9-37" aria-hidden="true" tabindex="-1"></a>    <span class="dv">4185381</span>, <span class="dv">4315485</span>, <span class="dv">4291070</span>, <span class="dv">311614</span>, <span class="dv">1460833</span>, <span class="dv">4006432</span>, <span class="dv">311630</span>, <span class="dv">1844340</span>,</span>
-<span id="cb9-38"><a href="#cb9-38" aria-hidden="true" tabindex="-1"></a>    <span class="dv">4868213</span>, <span class="dv">4313215</span>, <span class="dv">1681743</span>, <span class="dv">309711</span>, <span class="dv">1343092</span>, <span class="dv">6320634</span>, <span class="dv">1861130</span>, <span class="dv">5819871</span>,</span>
-<span id="cb9-39"><a href="#cb9-39" aria-hidden="true" tabindex="-1"></a>    <span class="dv">311644</span>, <span class="dv">1340484</span>, <span class="dv">6452647</span>, <span class="dv">1170883</span>, <span class="dv">1226746</span>, <span class="dv">4635068</span>, <span class="dv">1490895</span>, <span class="dv">2990344</span>,</span>
-<span id="cb9-40"><a href="#cb9-40" aria-hidden="true" tabindex="-1"></a>    <span class="dv">311674</span>, <span class="dv">926787</span>, <span class="dv">6229922</span>, <span class="dv">2127892</span>, <span class="dv">4315531</span>, <span class="dv">4006436</span>, <span class="dv">756756</span>, <span class="dv">308337</span>, </span>
-<span id="cb9-41"><a href="#cb9-41" aria-hidden="true" tabindex="-1"></a>    <span class="dv">308367</span>, <span class="dv">1807195</span>, <span class="dv">308375</span>, <span class="dv">307363</span>, <span class="dv">1845547</span>, <span class="dv">1845547</span>, <span class="dv">1959408</span>, <span class="dv">308762</span>,</span>
-<span id="cb9-42"><a href="#cb9-42" aria-hidden="true" tabindex="-1"></a>    <span class="dv">6856711</span>)) <span class="sc">%&gt;%</span></span>
-<span id="cb9-43"><a href="#cb9-43" aria-hidden="true" tabindex="-1"></a>  <span class="co"># Manually override a few song names to match the ones in Wikipedia (later)</span></span>
-<span id="cb9-44"><a href="#cb9-44" aria-hidden="true" tabindex="-1"></a>  <span class="fu">mutate</span>(<span class="at">song =</span> <span class="fu">case_when</span>(</span>
-<span id="cb9-45"><a href="#cb9-45" aria-hidden="true" tabindex="-1"></a>    song <span class="sc">==</span> <span class="st">&quot;Anagram (For Mongo)&quot;</span> <span class="sc">~</span> <span class="st">&quot;Anagram&quot;</span>,</span>
-<span id="cb9-46"><a href="#cb9-46" aria-hidden="true" tabindex="-1"></a>    song <span class="sc">==</span> <span class="st">&quot;Beneath, Between and Behind&quot;</span> <span class="sc">~</span> <span class="st">&quot;Beneath, Between, and Behind&quot;</span>,</span>
-<span id="cb9-47"><a href="#cb9-47" aria-hidden="true" tabindex="-1"></a>    song <span class="sc">==</span> <span class="st">&quot;Cygnus X-1, Book II: Hemispheres&quot;</span> <span class="sc">~</span> <span class="st">&quot;Cygnus X-1 Book II: Hemispheres&quot;</span>,</span>
-<span id="cb9-48"><a href="#cb9-48" aria-hidden="true" tabindex="-1"></a>    song <span class="sc">==</span> <span class="st">&quot;La Villa Strangiato (An Exercise in Self-Indulgence)&quot;</span> <span class="sc">~</span> <span class="st">&quot;La Villa Strangiato&quot;</span>,</span>
-<span id="cb9-49"><a href="#cb9-49" aria-hidden="true" tabindex="-1"></a>    song <span class="sc">==</span> <span class="st">&quot;The Larger Bowl (A Pantoum)&quot;</span> <span class="sc">~</span> <span class="st">&quot;The Larger Bowl&quot;</span>,</span>
-<span id="cb9-50"><a href="#cb9-50" aria-hidden="true" tabindex="-1"></a>    <span class="cn">TRUE</span> <span class="sc">~</span> song</span>
-<span id="cb9-51"><a href="#cb9-51" aria-hidden="true" tabindex="-1"></a>  )</span>
-<span id="cb9-52"><a href="#cb9-52" aria-hidden="true" tabindex="-1"></a>)</span></code></pre></div>
-<p>The result of all that is data frame <code>songs_1</code>. <code>songs_1</code> has 483 rows, which seems about right.</p>
+<span id="cb9-35"><a href="#cb9-35" aria-hidden="true" tabindex="-1"></a>    <span class="dv">309826</span>, <span class="dv">308837</span>, <span class="dv">308869</span>, <span class="dv">757331</span>, <span class="dv">308352</span>, <span class="dv">756879</span>, <span class="dv">756789</span>, <span class="dv">756546</span>, <span class="dv">757944</span>)) <span class="sc">%&gt;%</span></span>
+<span id="cb9-36"><a href="#cb9-36" aria-hidden="true" tabindex="-1"></a>  <span class="co"># Exclude other odd-balls</span></span>
+<span id="cb9-37"><a href="#cb9-37" aria-hidden="true" tabindex="-1"></a>  <span class="fu">filter</span>(<span class="sc">!</span>song_id <span class="sc">%in%</span> <span class="fu">c</span>(</span>
+<span id="cb9-38"><a href="#cb9-38" aria-hidden="true" tabindex="-1"></a>    <span class="dv">1559832</span>, <span class="dv">3695386</span>, <span class="dv">1465765</span>, <span class="dv">401323</span>, <span class="dv">4433004</span>, <span class="dv">4432946</span>, <span class="dv">4431337</span>, <span class="dv">2845669</span>,</span>
+<span id="cb9-39"><a href="#cb9-39" aria-hidden="true" tabindex="-1"></a>    <span class="dv">6681876</span>, <span class="dv">6540568</span>, <span class="dv">6681876</span>, <span class="dv">4006420</span>, <span class="dv">1184464</span>, <span class="dv">1271730</span>, <span class="dv">5522634</span>, <span class="dv">2845671</span>,</span>
+<span id="cb9-40"><a href="#cb9-40" aria-hidden="true" tabindex="-1"></a>    <span class="dv">4185381</span>, <span class="dv">4315485</span>, <span class="dv">4291070</span>, <span class="dv">311614</span>, <span class="dv">1460833</span>, <span class="dv">4006432</span>, <span class="dv">311630</span>, <span class="dv">1844340</span>,</span>
+<span id="cb9-41"><a href="#cb9-41" aria-hidden="true" tabindex="-1"></a>    <span class="dv">4868213</span>, <span class="dv">4313215</span>, <span class="dv">1681743</span>, <span class="dv">309711</span>, <span class="dv">1343092</span>, <span class="dv">6320634</span>, <span class="dv">1861130</span>, <span class="dv">5819871</span>,</span>
+<span id="cb9-42"><a href="#cb9-42" aria-hidden="true" tabindex="-1"></a>    <span class="dv">311644</span>, <span class="dv">1340484</span>, <span class="dv">6452647</span>, <span class="dv">1170883</span>, <span class="dv">1226746</span>, <span class="dv">4635068</span>, <span class="dv">1490895</span>, <span class="dv">2990344</span>,</span>
+<span id="cb9-43"><a href="#cb9-43" aria-hidden="true" tabindex="-1"></a>    <span class="dv">311674</span>, <span class="dv">926787</span>, <span class="dv">6229922</span>, <span class="dv">2127892</span>, <span class="dv">4315531</span>, <span class="dv">4006436</span>, <span class="dv">756756</span>, <span class="dv">308337</span>, </span>
+<span id="cb9-44"><a href="#cb9-44" aria-hidden="true" tabindex="-1"></a>    <span class="dv">308367</span>, <span class="dv">1807195</span>, <span class="dv">308375</span>, <span class="dv">307363</span>, <span class="dv">1845547</span>, <span class="dv">1845547</span>, <span class="dv">1959408</span>, <span class="dv">308762</span>,</span>
+<span id="cb9-45"><a href="#cb9-45" aria-hidden="true" tabindex="-1"></a>    <span class="dv">6856711</span>, <span class="dv">311682</span>, <span class="dv">861570</span>, <span class="dv">308340</span>, <span class="dv">308342</span>, <span class="dv">307558</span>)) <span class="sc">%&gt;%</span></span>
+<span id="cb9-46"><a href="#cb9-46" aria-hidden="true" tabindex="-1"></a>  <span class="co"># Manually override a few song names to match the ones in Wikipedia (later)</span></span>
+<span id="cb9-47"><a href="#cb9-47" aria-hidden="true" tabindex="-1"></a>  <span class="fu">mutate</span>(<span class="at">song =</span> <span class="fu">case_when</span>(</span>
+<span id="cb9-48"><a href="#cb9-48" aria-hidden="true" tabindex="-1"></a>    song <span class="sc">==</span> <span class="st">&quot;Anagram (For Mongo)&quot;</span> <span class="sc">~</span> <span class="st">&quot;Anagram&quot;</span>,</span>
+<span id="cb9-49"><a href="#cb9-49" aria-hidden="true" tabindex="-1"></a>    song <span class="sc">==</span> <span class="st">&quot;Beneath, Between and Behind&quot;</span> <span class="sc">~</span> <span class="st">&quot;Beneath, Between, and Behind&quot;</span>,</span>
+<span id="cb9-50"><a href="#cb9-50" aria-hidden="true" tabindex="-1"></a>    song <span class="sc">==</span> <span class="st">&quot;Cygnus X-1, Book II: Hemispheres&quot;</span> <span class="sc">~</span> <span class="st">&quot;Cygnus X-1 Book II: Hemispheres&quot;</span>,</span>
+<span id="cb9-51"><a href="#cb9-51" aria-hidden="true" tabindex="-1"></a>    song <span class="sc">==</span> <span class="st">&quot;La Villa Strangiato (An Exercise in Self-Indulgence)&quot;</span> <span class="sc">~</span> <span class="st">&quot;La Villa Strangiato&quot;</span>,</span>
+<span id="cb9-52"><a href="#cb9-52" aria-hidden="true" tabindex="-1"></a>    song <span class="sc">==</span> <span class="st">&quot;The Larger Bowl (A Pantoum)&quot;</span> <span class="sc">~</span> <span class="st">&quot;The Larger Bowl&quot;</span>,</span>
+<span id="cb9-53"><a href="#cb9-53" aria-hidden="true" tabindex="-1"></a>    <span class="cn">TRUE</span> <span class="sc">~</span> song</span>
+<span id="cb9-54"><a href="#cb9-54" aria-hidden="true" tabindex="-1"></a>  )</span>
+<span id="cb9-55"><a href="#cb9-55" aria-hidden="true" tabindex="-1"></a>)</span></code></pre></div>
+<p>The result of all that is data frame <code>songs_1</code>. <code>songs_1</code> has 466 rows, which seems about right.</p>
 <div class="sourceCode" id="cb10"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb10-1"><a href="#cb10-1" aria-hidden="true" tabindex="-1"></a><span class="fu">glimpse</span>(songs_1)</span></code></pre></div>
-<pre><code>## Rows: 483
+<pre><code>## Rows: 466
 ## Columns: 4
 ## $ artist_id &lt;int&gt; 4384, 4384, 4384, 4384, 4384, 4384, 4384, 4384, 4384, 4384, ~
 ## $ song_id   &lt;int&gt; 78816, 142058, 235157, 243268, 238394, 243253, 234389, 23441~
@@ -526,11 +531,11 @@ div.tocify {
 ## $ song_url  &lt;chr&gt; &quot;https://genius.com/Rush-2112-lyrics&quot;, &quot;https://genius.com/R~</code></pre>
 <div class="sourceCode" id="cb12"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb12-1"><a href="#cb12-1" aria-hidden="true" tabindex="-1"></a>songs_1 <span class="sc">%&gt;%</span> janitor<span class="sc">::</span><span class="fu">tabyl</span>(artist_id) <span class="sc">%&gt;%</span> janitor<span class="sc">::</span><span class="fu">adorn_totals</span>()</span></code></pre></div>
 <pre><code>##  artist_id   n   percent
-##        563 149 0.3084886
-##       4384 149 0.3084886
-##      20268 185 0.3830228
-##      Total 483 1.0000000</code></pre>
-<p>Now that I have my 483 song URLs, I am ready to extract the lyrics from each URL.</p>
+##        563 143 0.3068670
+##       4384 148 0.3175966
+##      20268 175 0.3755365
+##      Total 466 1.0000000</code></pre>
+<p>Now that I have my 466 song URLs, I am ready to extract the lyrics from each URL.</p>
 </div>
 </div>
 <div id="web-scrape-song-lyrics" class="section level2">
@@ -574,7 +579,7 @@ div.tocify {
 <span id="cb14-36"><a href="#cb14-36" aria-hidden="true" tabindex="-1"></a>}</span>
 <span id="cb14-37"><a href="#cb14-37" aria-hidden="true" tabindex="-1"></a></span>
 <span id="cb14-38"><a href="#cb14-38" aria-hidden="true" tabindex="-1"></a><span class="fu">glimpse</span>(lyrics_raw)</span></code></pre></div>
-<pre><code>## Rows: 483
+<pre><code>## Rows: 466
 ## Columns: 6
 ## $ artist_id &lt;int&gt; 4384, 4384, 4384, 4384, 4384, 4384, 4384, 4384, 4384, 4384, ~
 ## $ song_id   &lt;int&gt; 78816, 142058, 235157, 243268, 238394, 243253, 234389, 23441~
@@ -627,19 +632,19 @@ div.tocify {
 <span id="cb21-13"><a href="#cb21-13" aria-hidden="true" tabindex="-1"></a></span>
 <span id="cb21-14"><a href="#cb21-14" aria-hidden="true" tabindex="-1"></a>lyrics_2 <span class="sc">%&gt;%</span> janitor<span class="sc">::</span><span class="fu">tabyl</span>(writer) <span class="sc">%&gt;%</span> janitor<span class="sc">::</span><span class="fu">adorn_totals</span>()</span></code></pre></div>
 <pre><code>##           writer   n    percent
-##            AC/DC 185 0.38302277
-##        Brian May  41 0.08488613
-##  Freddie Mercury  52 0.10766046
-##      John Deacon  16 0.03312629
-##       Neil Peart 149 0.30848861
-##            Queen  16 0.03312629
-##     Roger Taylor  24 0.04968944
-##            Total 483 1.00000000</code></pre>
+##            AC/DC 175 0.37553648
+##        Brian May  39 0.08369099
+##  Freddie Mercury  50 0.10729614
+##      John Deacon  16 0.03433476
+##       Neil Peart 148 0.31759657
+##            Queen  15 0.03218884
+##     Roger Taylor  23 0.04935622
+##            Total 466 1.00000000</code></pre>
 </div>
 <div id="album-names" class="section level2">
 <h2>Album Names</h2>
-<p>I didn’t find a good way to pull the album name from Genius, so I’ll scrape it from Wikipedia instead. I transformed a lot of names so that this data frame will join properly to my master data frame.</p>
-<div class="sourceCode" id="cb23"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb23-1"><a href="#cb23-1" aria-hidden="true" tabindex="-1"></a><span class="co"># Rush -------------------------------------------------------------------------</span></span>
+<p>I didn’t find a good way to pull the album name from Genius, so I’ll scrape it from Wikipedia instead. I transformed a lot of names so that this data frame will join properly to my master data frame. I’m hiding the chunk for aesthetics.</p>
+<div class="sourceCode" id="cb23"><pre class="sourceCode r fold-hide"><code class="sourceCode r"><span id="cb23-1"><a href="#cb23-1" aria-hidden="true" tabindex="-1"></a><span class="co"># Rush -------------------------------------------------------------------------</span></span>
 <span id="cb23-2"><a href="#cb23-2" aria-hidden="true" tabindex="-1"></a>rush_wiki_xml <span class="ot">&lt;-</span> <span class="fu">read_html</span>(<span class="st">&quot;https://en.wikipedia.org/wiki/List_of_songs_recorded_by_Rush&quot;</span>)</span>
 <span id="cb23-3"><a href="#cb23-3" aria-hidden="true" tabindex="-1"></a></span>
 <span id="cb23-4"><a href="#cb23-4" aria-hidden="true" tabindex="-1"></a>rush_albums <span class="ot">&lt;-</span> rush_wiki_xml <span class="sc">%&gt;%</span> </span>
@@ -673,39 +678,61 @@ div.tocify {
 <span id="cb23-32"><a href="#cb23-32" aria-hidden="true" tabindex="-1"></a>      Song <span class="sc">==</span> <span class="st">&quot;You And I&quot;</span> <span class="sc">~</span> <span class="st">&quot;You and I&quot;</span>,</span>
 <span id="cb23-33"><a href="#cb23-33" aria-hidden="true" tabindex="-1"></a>      Song <span class="sc">==</span> <span class="st">&quot;Hang On in There&quot;</span> <span class="sc">~</span> <span class="st">&quot;Hang on in There&quot;</span>,</span>
 <span id="cb23-34"><a href="#cb23-34" aria-hidden="true" tabindex="-1"></a>      <span class="cn">TRUE</span> <span class="sc">~</span> Song),</span>
-<span id="cb23-35"><a href="#cb23-35" aria-hidden="true" tabindex="-1"></a>    <span class="at">Album =</span> <span class="fu">str_trim</span>(<span class="st">`</span><span class="at">Original release</span><span class="st">`</span>, <span class="at">side =</span> <span class="st">&quot;both&quot;</span>)</span>
-<span id="cb23-36"><a href="#cb23-36" aria-hidden="true" tabindex="-1"></a>  ) <span class="sc">%&gt;%</span></span>
-<span id="cb23-37"><a href="#cb23-37" aria-hidden="true" tabindex="-1"></a>  <span class="fu">select</span>(<span class="at">song =</span> Song, <span class="at">album =</span> Album, <span class="at">released =</span> Year)</span>
-<span id="cb23-38"><a href="#cb23-38" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb23-39"><a href="#cb23-39" aria-hidden="true" tabindex="-1"></a><span class="co"># AC/DC ------------------------------------------------------------------------</span></span>
-<span id="cb23-40"><a href="#cb23-40" aria-hidden="true" tabindex="-1"></a>acdc_wiki_xml <span class="ot">&lt;-</span> <span class="fu">read_html</span>(<span class="st">&quot;https://en.wikipedia.org/wiki/List_of_songs_recorded_by_AC/DC&quot;</span>)</span>
-<span id="cb23-41"><a href="#cb23-41" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb23-42"><a href="#cb23-42" aria-hidden="true" tabindex="-1"></a>acdc_albums <span class="ot">&lt;-</span> acdc_wiki_xml <span class="sc">%&gt;%</span> </span>
-<span id="cb23-43"><a href="#cb23-43" aria-hidden="true" tabindex="-1"></a>  <span class="fu">html_elements</span>(<span class="st">&quot;table&quot;</span>) <span class="sc">%&gt;%</span> .[[<span class="dv">3</span>]] <span class="sc">%&gt;%</span> </span>
-<span id="cb23-44"><a href="#cb23-44" aria-hidden="true" tabindex="-1"></a>  <span class="fu">html_table</span>() <span class="sc">%&gt;%</span></span>
-<span id="cb23-45"><a href="#cb23-45" aria-hidden="true" tabindex="-1"></a>  <span class="fu">mutate</span>(</span>
-<span id="cb23-46"><a href="#cb23-46" aria-hidden="true" tabindex="-1"></a>    <span class="at">artist_id =</span> artist_ids[<span class="st">&quot;ac/dc&quot;</span>],</span>
-<span id="cb23-47"><a href="#cb23-47" aria-hidden="true" tabindex="-1"></a>    <span class="at">Song =</span> <span class="fu">str_remove_all</span>(Song, <span class="st">&quot;(</span><span class="sc">\&quot;</span><span class="st">)|(†)&quot;</span>),</span>
-<span id="cb23-48"><a href="#cb23-48" aria-hidden="true" tabindex="-1"></a>    <span class="at">Song =</span> <span class="fu">str_trim</span>(Song, <span class="at">side =</span> <span class="st">&quot;both&quot;</span>),</span>
-<span id="cb23-49"><a href="#cb23-49" aria-hidden="true" tabindex="-1"></a>    <span class="at">Song =</span> <span class="fu">str_remove</span>(Song, <span class="st">&quot;</span><span class="sc">\\</span><span class="st">[.</span><span class="sc">\\</span><span class="st">]&quot;</span>),</span>
-<span id="cb23-50"><a href="#cb23-50" aria-hidden="true" tabindex="-1"></a>    <span class="at">Song =</span> <span class="fu">case_when</span>(</span>
-<span id="cb23-51"><a href="#cb23-51" aria-hidden="true" tabindex="-1"></a>      Song <span class="sc">==</span> <span class="st">&quot;Ain&#39;t No Fun (Waiting Round to Be a Millionaire)&quot;</span> <span class="sc">~</span> <span class="st">&quot;Ain&#39;t No Fun (Waiting &#39;Round to Be a Millionaire)&quot;</span>,</span>
-<span id="cb23-52"><a href="#cb23-52" aria-hidden="true" tabindex="-1"></a>      <span class="co"># Song == &quot;Bonny[b]&quot; ~ &quot;Bonny&quot;,</span></span>
-<span id="cb23-53"><a href="#cb23-53" aria-hidden="true" tabindex="-1"></a>      Song <span class="sc">==</span> <span class="st">&quot;Given the Dog a Bone&quot;</span> <span class="sc">~</span> <span class="st">&quot;Givin&#39; the Dog a Bone&quot;</span>,</span>
-<span id="cb23-54"><a href="#cb23-54" aria-hidden="true" tabindex="-1"></a>      <span class="co"># Song == &quot;Can&#39;t Stop Rock &#39;n&#39; Roll&quot; ~ &quot;Can&#39;t Stop Rock &#39;N&#39; Roll&quot;,</span></span>
-<span id="cb23-55"><a href="#cb23-55" aria-hidden="true" tabindex="-1"></a>      Song <span class="sc">==</span> <span class="st">&quot;Rock &#39;n Roll Train&quot;</span> <span class="sc">~</span> <span class="st">&quot;Rock &#39;n&#39; Roll Train&quot;</span>,</span>
-<span id="cb23-56"><a href="#cb23-56" aria-hidden="true" tabindex="-1"></a>      Song <span class="sc">==</span> <span class="st">&quot;She Likes Rock n Roll&quot;</span> <span class="sc">~</span> <span class="st">&quot;She Likes Rock &#39;n&#39; Roll&quot;</span>,</span>
-<span id="cb23-57"><a href="#cb23-57" aria-hidden="true" tabindex="-1"></a>      Song <span class="sc">==</span> <span class="st">&quot;Some Sin for Nuthin&#39;&quot;</span> <span class="sc">~</span> <span class="st">&quot;Some Sin for Nothin&#39;&quot;</span>,</span>
-<span id="cb23-58"><a href="#cb23-58" aria-hidden="true" tabindex="-1"></a>      <span class="co"># Song == &quot;Can&#39;t Stop Rock &#39;N&#39; Roll&quot; ~ &quot;Can&#39;t Stop Rock &#39;n&#39; Roll&quot;,</span></span>
-<span id="cb23-59"><a href="#cb23-59" aria-hidden="true" tabindex="-1"></a>      <span class="cn">TRUE</span> <span class="sc">~</span> Song</span>
-<span id="cb23-60"><a href="#cb23-60" aria-hidden="true" tabindex="-1"></a>    ),</span>
-<span id="cb23-61"><a href="#cb23-61" aria-hidden="true" tabindex="-1"></a>    <span class="at">Album =</span> <span class="fu">str_trim</span>(<span class="st">`</span><span class="at">Album(s)</span><span class="st">`</span>, <span class="at">side =</span> <span class="st">&quot;both&quot;</span>)</span>
-<span id="cb23-62"><a href="#cb23-62" aria-hidden="true" tabindex="-1"></a>  ) <span class="sc">%&gt;%</span></span>
-<span id="cb23-63"><a href="#cb23-63" aria-hidden="true" tabindex="-1"></a>  <span class="fu">select</span>(<span class="at">song =</span> Song, <span class="at">album =</span> Album, <span class="at">released =</span> <span class="st">`</span><span class="at">Year of first release</span><span class="st">`</span>)</span>
-<span id="cb23-64"><a href="#cb23-64" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb23-65"><a href="#cb23-65" aria-hidden="true" tabindex="-1"></a>song_albums <span class="ot">&lt;-</span> <span class="fu">bind_rows</span>(rush_albums, queen_albums, acdc_albums)</span>
-<span id="cb23-66"><a href="#cb23-66" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb23-67"><a href="#cb23-67" aria-hidden="true" tabindex="-1"></a><span class="fu">glimpse</span>(song_albums)</span></code></pre></div>
+<span id="cb23-35"><a href="#cb23-35" aria-hidden="true" tabindex="-1"></a>    <span class="at">Year =</span> <span class="fu">if_else</span>(Year <span class="sc">==</span> <span class="dv">19731974</span>, <span class="fu">as.integer</span>(<span class="dv">1974</span>), Year),</span>
+<span id="cb23-36"><a href="#cb23-36" aria-hidden="true" tabindex="-1"></a>    <span class="at">Year =</span> <span class="fu">if_else</span>(Year <span class="sc">==</span> <span class="dv">1979</span>, <span class="fu">as.integer</span>(<span class="dv">1980</span>), Year),</span>
+<span id="cb23-37"><a href="#cb23-37" aria-hidden="true" tabindex="-1"></a>    <span class="at">Year =</span> <span class="fu">if_else</span>(Year <span class="sc">==</span> <span class="dv">1985</span>, <span class="fu">as.integer</span>(<span class="dv">1986</span>), Year),</span>
+<span id="cb23-38"><a href="#cb23-38" aria-hidden="true" tabindex="-1"></a>    <span class="at">Album =</span> <span class="fu">str_trim</span>(<span class="st">`</span><span class="at">Original release</span><span class="st">`</span>, <span class="at">side =</span> <span class="st">&quot;both&quot;</span>),</span>
+<span id="cb23-39"><a href="#cb23-39" aria-hidden="true" tabindex="-1"></a>    <span class="at">Album =</span> <span class="fu">if_else</span>(Album <span class="sc">==</span> <span class="st">&quot;Queen / Queen II&quot;</span>, <span class="st">&quot;Queen II&quot;</span>, Album)</span>
+<span id="cb23-40"><a href="#cb23-40" aria-hidden="true" tabindex="-1"></a>  ) <span class="sc">%&gt;%</span></span>
+<span id="cb23-41"><a href="#cb23-41" aria-hidden="true" tabindex="-1"></a>  <span class="fu">select</span>(<span class="at">song =</span> Song, <span class="at">album =</span> Album, <span class="at">released =</span> Year)</span>
+<span id="cb23-42"><a href="#cb23-42" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb23-43"><a href="#cb23-43" aria-hidden="true" tabindex="-1"></a><span class="co"># AC/DC ------------------------------------------------------------------------</span></span>
+<span id="cb23-44"><a href="#cb23-44" aria-hidden="true" tabindex="-1"></a>acdc_wiki_xml <span class="ot">&lt;-</span> <span class="fu">read_html</span>(<span class="st">&quot;https://en.wikipedia.org/wiki/List_of_songs_recorded_by_AC/DC&quot;</span>)</span>
+<span id="cb23-45"><a href="#cb23-45" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb23-46"><a href="#cb23-46" aria-hidden="true" tabindex="-1"></a>acdc_albums <span class="ot">&lt;-</span> acdc_wiki_xml <span class="sc">%&gt;%</span> </span>
+<span id="cb23-47"><a href="#cb23-47" aria-hidden="true" tabindex="-1"></a>  <span class="fu">html_elements</span>(<span class="st">&quot;table&quot;</span>) <span class="sc">%&gt;%</span> .[[<span class="dv">3</span>]] <span class="sc">%&gt;%</span> </span>
+<span id="cb23-48"><a href="#cb23-48" aria-hidden="true" tabindex="-1"></a>  <span class="fu">html_table</span>() <span class="sc">%&gt;%</span></span>
+<span id="cb23-49"><a href="#cb23-49" aria-hidden="true" tabindex="-1"></a>  <span class="fu">mutate</span>(</span>
+<span id="cb23-50"><a href="#cb23-50" aria-hidden="true" tabindex="-1"></a>    <span class="at">artist_id =</span> artist_ids[<span class="st">&quot;ac/dc&quot;</span>],</span>
+<span id="cb23-51"><a href="#cb23-51" aria-hidden="true" tabindex="-1"></a>    <span class="at">Song =</span> <span class="fu">str_remove_all</span>(Song, <span class="st">&quot;(</span><span class="sc">\&quot;</span><span class="st">)|(†)&quot;</span>),</span>
+<span id="cb23-52"><a href="#cb23-52" aria-hidden="true" tabindex="-1"></a>    <span class="at">Song =</span> <span class="fu">str_trim</span>(Song, <span class="at">side =</span> <span class="st">&quot;both&quot;</span>),</span>
+<span id="cb23-53"><a href="#cb23-53" aria-hidden="true" tabindex="-1"></a>    <span class="at">Song =</span> <span class="fu">str_remove</span>(Song, <span class="st">&quot;</span><span class="sc">\\</span><span class="st">[.</span><span class="sc">\\</span><span class="st">]&quot;</span>),</span>
+<span id="cb23-54"><a href="#cb23-54" aria-hidden="true" tabindex="-1"></a>    <span class="at">Song =</span> <span class="fu">case_when</span>(</span>
+<span id="cb23-55"><a href="#cb23-55" aria-hidden="true" tabindex="-1"></a>      Song <span class="sc">==</span> <span class="st">&quot;Ain&#39;t No Fun (Waiting Round to Be a Millionaire)&quot;</span> <span class="sc">~</span> <span class="st">&quot;Ain&#39;t No Fun (Waiting &#39;Round to Be a Millionaire)&quot;</span>,</span>
+<span id="cb23-56"><a href="#cb23-56" aria-hidden="true" tabindex="-1"></a>      <span class="co"># Song == &quot;Bonny[b]&quot; ~ &quot;Bonny&quot;,</span></span>
+<span id="cb23-57"><a href="#cb23-57" aria-hidden="true" tabindex="-1"></a>      Song <span class="sc">==</span> <span class="st">&quot;Given the Dog a Bone&quot;</span> <span class="sc">~</span> <span class="st">&quot;Givin&#39; the Dog a Bone&quot;</span>,</span>
+<span id="cb23-58"><a href="#cb23-58" aria-hidden="true" tabindex="-1"></a>      <span class="co"># Song == &quot;Can&#39;t Stop Rock &#39;n&#39; Roll&quot; ~ &quot;Can&#39;t Stop Rock &#39;N&#39; Roll&quot;,</span></span>
+<span id="cb23-59"><a href="#cb23-59" aria-hidden="true" tabindex="-1"></a>      Song <span class="sc">==</span> <span class="st">&quot;Rock &#39;n Roll Train&quot;</span> <span class="sc">~</span> <span class="st">&quot;Rock &#39;n&#39; Roll Train&quot;</span>,</span>
+<span id="cb23-60"><a href="#cb23-60" aria-hidden="true" tabindex="-1"></a>      Song <span class="sc">==</span> <span class="st">&quot;She Likes Rock n Roll&quot;</span> <span class="sc">~</span> <span class="st">&quot;She Likes Rock &#39;n&#39; Roll&quot;</span>,</span>
+<span id="cb23-61"><a href="#cb23-61" aria-hidden="true" tabindex="-1"></a>      Song <span class="sc">==</span> <span class="st">&quot;Some Sin for Nuthin&#39;&quot;</span> <span class="sc">~</span> <span class="st">&quot;Some Sin for Nothin&#39;&quot;</span>,</span>
+<span id="cb23-62"><a href="#cb23-62" aria-hidden="true" tabindex="-1"></a>      <span class="co"># Song == &quot;Can&#39;t Stop Rock &#39;N&#39; Roll&quot; ~ &quot;Can&#39;t Stop Rock &#39;n&#39; Roll&quot;,</span></span>
+<span id="cb23-63"><a href="#cb23-63" aria-hidden="true" tabindex="-1"></a>      <span class="cn">TRUE</span> <span class="sc">~</span> Song</span>
+<span id="cb23-64"><a href="#cb23-64" aria-hidden="true" tabindex="-1"></a>    ),</span>
+<span id="cb23-65"><a href="#cb23-65" aria-hidden="true" tabindex="-1"></a>    <span class="st">`</span><span class="at">Album(s)</span><span class="st">`</span> <span class="ot">=</span> <span class="fu">str_remove_all</span>(<span class="st">`</span><span class="at">Album(s)</span><span class="st">`</span>, <span class="st">&quot;(AC/DC Live)|(</span><span class="sc">\\</span><span class="st">(Australia</span><span class="sc">\\</span><span class="st">))&quot;</span>),</span>
+<span id="cb23-66"><a href="#cb23-66" aria-hidden="true" tabindex="-1"></a>    <span class="st">`</span><span class="at">Album(s)</span><span class="st">`</span> <span class="ot">=</span> <span class="fu">str_remove_all</span>(<span class="st">`</span><span class="at">Album(s)</span><span class="st">`</span>, <span class="st">&quot;(Iron Man 2)|(Live at River Plate)&quot;</span>),</span>
+<span id="cb23-67"><a href="#cb23-67" aria-hidden="true" tabindex="-1"></a>    <span class="st">`</span><span class="at">Album(s)</span><span class="st">`</span> <span class="ot">=</span> <span class="fu">str_remove_all</span>(<span class="st">`</span><span class="at">Album(s)</span><span class="st">`</span>, <span class="st">&quot;(Backtracks)|(&#39;74 Jailbreak)&quot;</span>),</span>
+<span id="cb23-68"><a href="#cb23-68" aria-hidden="true" tabindex="-1"></a>    <span class="st">`</span><span class="at">Album(s)</span><span class="st">`</span> <span class="ot">=</span> <span class="fu">str_remove_all</span>(<span class="st">`</span><span class="at">Album(s)</span><span class="st">`</span>, <span class="st">&quot;(If You Want Blood You&#39;ve Got It)&quot;</span>),</span>
+<span id="cb23-69"><a href="#cb23-69" aria-hidden="true" tabindex="-1"></a>    <span class="st">`</span><span class="at">Album(s)</span><span class="st">`</span> <span class="ot">=</span> <span class="fu">str_remove_all</span>(<span class="st">`</span><span class="at">Album(s)</span><span class="st">`</span>, <span class="st">&quot;(Volts)&quot;</span>),</span>
+<span id="cb23-70"><a href="#cb23-70" aria-hidden="true" tabindex="-1"></a>    <span class="st">`</span><span class="at">Album(s)</span><span class="st">`</span> <span class="ot">=</span> <span class="fu">str_remove_all</span>(<span class="st">`</span><span class="at">Album(s)</span><span class="st">`</span>, <span class="st">&quot;(</span><span class="sc">\\</span><span class="st">(North America &amp; Japan, all later releases</span><span class="sc">\\</span><span class="st">))&quot;</span>),</span>
+<span id="cb23-71"><a href="#cb23-71" aria-hidden="true" tabindex="-1"></a>    <span class="st">`</span><span class="at">Album(s)</span><span class="st">`</span> <span class="ot">=</span> <span class="fu">str_remove_all</span>(<span class="st">`</span><span class="at">Album(s)</span><span class="st">`</span>, <span class="st">&quot;(</span><span class="sc">\\</span><span class="st">(Europe &amp; Australia</span><span class="sc">\\</span><span class="st">)|</span><span class="sc">\\</span><span class="st">(Europe</span><span class="sc">\\</span><span class="st">))&quot;</span>),</span>
+<span id="cb23-72"><a href="#cb23-72" aria-hidden="true" tabindex="-1"></a>    <span class="st">`</span><span class="at">Album(s)</span><span class="st">`</span> <span class="ot">=</span> <span class="fu">str_replace</span>(<span class="st">`</span><span class="at">Album(s)</span><span class="st">`</span>, <span class="st">&quot;Back in BlackWho Made Who&quot;</span>, <span class="st">&quot;Back in Black&quot;</span>),</span>
+<span id="cb23-73"><a href="#cb23-73" aria-hidden="true" tabindex="-1"></a>    <span class="st">`</span><span class="at">Album(s)</span><span class="st">`</span> <span class="ot">=</span> <span class="fu">str_replace</span>(<span class="st">`</span><span class="at">Album(s)</span><span class="st">`</span>, <span class="st">&quot;Dirty Deeds Done Dirt CheapLet There Be Rock&quot;</span>, <span class="st">&quot;Dirty Deeds Done Dirt Cheap&quot;</span>),</span>
+<span id="cb23-74"><a href="#cb23-74" aria-hidden="true" tabindex="-1"></a>    <span class="st">`</span><span class="at">Album(s)</span><span class="st">`</span> <span class="ot">=</span> <span class="fu">str_replace</span>(<span class="st">`</span><span class="at">Album(s)</span><span class="st">`</span>, <span class="st">&quot;Dirty Deeds Done Dirt CheapWho Made Who&quot;</span>, <span class="st">&quot;Dirty Deeds Done Dirt Cheap&quot;</span>),</span>
+<span id="cb23-75"><a href="#cb23-75" aria-hidden="true" tabindex="-1"></a>    <span class="st">`</span><span class="at">Album(s)</span><span class="st">`</span> <span class="ot">=</span> <span class="fu">str_replace</span>(<span class="st">`</span><span class="at">Album(s)</span><span class="st">`</span>, <span class="st">&quot;T.N.T.&quot;</span>, <span class="st">&quot;T.N.T./High Voltage&quot;</span>),</span>
+<span id="cb23-76"><a href="#cb23-76" aria-hidden="true" tabindex="-1"></a>    <span class="st">`</span><span class="at">Album(s)</span><span class="st">`</span> <span class="ot">=</span> <span class="fu">str_replace</span>(<span class="st">`</span><span class="at">Album(s)</span><span class="st">`</span>, <span class="st">&quot;High Voltage&quot;</span>, <span class="st">&quot;T.N.T./High Voltage&quot;</span>),</span>
+<span id="cb23-77"><a href="#cb23-77" aria-hidden="true" tabindex="-1"></a>    <span class="st">`</span><span class="at">Album(s)</span><span class="st">`</span> <span class="ot">=</span> <span class="fu">str_replace</span>(<span class="st">`</span><span class="at">Album(s)</span><span class="st">`</span>, <span class="st">&quot;T.N.T./High Voltage High Voltage&quot;</span>, <span class="st">&quot;T.N.T./High Voltage&quot;</span>),</span>
+<span id="cb23-78"><a href="#cb23-78" aria-hidden="true" tabindex="-1"></a>    <span class="st">`</span><span class="at">Album(s)</span><span class="st">`</span> <span class="ot">=</span> <span class="fu">str_replace</span>(<span class="st">`</span><span class="at">Album(s)</span><span class="st">`</span>, <span class="st">&quot;T.N.T./T.N.T./High Voltage&quot;</span>, <span class="st">&quot;T.N.T./High Voltage&quot;</span>),</span>
+<span id="cb23-79"><a href="#cb23-79" aria-hidden="true" tabindex="-1"></a>    <span class="st">`</span><span class="at">Album(s)</span><span class="st">`</span> <span class="ot">=</span> <span class="fu">str_replace</span>(<span class="st">`</span><span class="at">Album(s)</span><span class="st">`</span>, <span class="st">&quot;T.N.T./High VoltageDirty Deeds Done Dirt Cheap&quot;</span>, <span class="st">&quot;T.N.T./High Voltage&quot;</span>),</span>
+<span id="cb23-80"><a href="#cb23-80" aria-hidden="true" tabindex="-1"></a>    <span class="st">`</span><span class="at">Album(s)</span><span class="st">`</span> <span class="ot">=</span> <span class="fu">str_replace</span>(<span class="st">`</span><span class="at">Album(s)</span><span class="st">`</span>, <span class="st">&quot;T.N.T./High VoltageHigh Voltage&quot;</span>, <span class="st">&quot;T.N.T./High Voltage&quot;</span>),</span>
+<span id="cb23-81"><a href="#cb23-81" aria-hidden="true" tabindex="-1"></a>    <span class="st">`</span><span class="at">Album(s)</span><span class="st">`</span> <span class="ot">=</span> <span class="fu">str_replace</span>(<span class="st">`</span><span class="at">Album(s)</span><span class="st">`</span>, <span class="st">&quot;Fly on the WallWho Made Who&quot;</span>, <span class="st">&quot;Fly on the Wall&quot;</span>),</span>
+<span id="cb23-82"><a href="#cb23-82" aria-hidden="true" tabindex="-1"></a>    <span class="st">`</span><span class="at">Album(s)</span><span class="st">`</span> <span class="ot">=</span> <span class="fu">str_replace</span>(<span class="st">`</span><span class="at">Album(s)</span><span class="st">`</span>, <span class="st">&quot;For Those About to Rock We Salute YouWho Made Who&quot;</span>, <span class="st">&quot;For Those About to Rock We Salute You&quot;</span>),</span>
+<span id="cb23-83"><a href="#cb23-83" aria-hidden="true" tabindex="-1"></a>    <span class="at">Album =</span> <span class="fu">str_trim</span>(<span class="st">`</span><span class="at">Album(s)</span><span class="st">`</span>, <span class="at">side =</span> <span class="st">&quot;both&quot;</span>)</span>
+<span id="cb23-84"><a href="#cb23-84" aria-hidden="true" tabindex="-1"></a>  ) <span class="sc">%&gt;%</span></span>
+<span id="cb23-85"><a href="#cb23-85" aria-hidden="true" tabindex="-1"></a>  <span class="fu">select</span>(<span class="at">song =</span> Song, <span class="at">album =</span> Album, <span class="at">released =</span> <span class="st">`</span><span class="at">Year of first release</span><span class="st">`</span>)</span>
+<span id="cb23-86"><a href="#cb23-86" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb23-87"><a href="#cb23-87" aria-hidden="true" tabindex="-1"></a>song_albums <span class="ot">&lt;-</span> <span class="fu">bind_rows</span>(rush_albums, queen_albums, acdc_albums)</span>
+<span id="cb23-88"><a href="#cb23-88" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb23-89"><a href="#cb23-89" aria-hidden="true" tabindex="-1"></a><span class="fu">glimpse</span>(song_albums)</span></code></pre></div>
 <pre><code>## Rows: 600
 ## Columns: 3
 ## $ song     &lt;chr&gt; &quot;Losing Again&quot;, &quot;You Don&#39;t Love Me&quot;, &quot;Living Loving Maid&quot;, &quot;C~
@@ -741,7 +768,7 @@ div.tocify {
 <span id="cb25-27"><a href="#cb25-27" aria-hidden="true" tabindex="-1"></a>  <span class="fu">select</span>(<span class="fu">everything</span>(), <span class="sc">-</span>lyrics, lyrics)</span>
 <span id="cb25-28"><a href="#cb25-28" aria-hidden="true" tabindex="-1"></a></span>
 <span id="cb25-29"><a href="#cb25-29" aria-hidden="true" tabindex="-1"></a><span class="fu">glimpse</span>(lyrics_3)</span></code></pre></div>
-<pre><code>## Rows: 483
+<pre><code>## Rows: 466
 ## Columns: 8
 ## $ artist_id &lt;int&gt; 4384, 4384, 4384, 4384, 4384, 4384, 4384, 4384, 4384, 4384, ~
 ## $ song_id   &lt;int&gt; 78816, 142058, 235157, 243268, 238394, 243253, 234389, 23441~
@@ -761,7 +788,7 @@ div.tocify {
 <span id="cb27-7"><a href="#cb27-7" aria-hidden="true" tabindex="-1"></a>  <span class="fu">select</span>(song_id, band, album, song, writer, released, song_url, lyrics)</span>
 <span id="cb27-8"><a href="#cb27-8" aria-hidden="true" tabindex="-1"></a></span>
 <span id="cb27-9"><a href="#cb27-9" aria-hidden="true" tabindex="-1"></a><span class="fu">glimpse</span>(lyrics_4)</span></code></pre></div>
-<pre><code>## Rows: 483
+<pre><code>## Rows: 466
 ## Columns: 8
 ## $ song_id  &lt;int&gt; 78816, 142058, 235157, 243268, 238394, 243253, 234389, 234413~
 ## $ band     &lt;chr&gt; &quot;Rush&quot;, &quot;Rush&quot;, &quot;Rush&quot;, &quot;Rush&quot;, &quot;Rush&quot;, &quot;Rush&quot;, &quot;Rush&quot;, &quot;Rush~

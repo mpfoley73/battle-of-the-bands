@@ -134,7 +134,9 @@ songs_0 <- bind_rows(songs_list) %>%
     song_url = url
   ) %>%
   # Some results have a different primary artist than the three I requested
-  filter(artist_id %in% artist_ids)
+  filter(artist_id %in% artist_ids) %>% 
+  # song id 307393 comes in twice. Enforce unique
+  unique()
 
 glimpse(songs_0)
 ```
@@ -162,7 +164,7 @@ songs_1 <- songs_0 %>%
     2216531, 4433029, 3155443, 1521243, 2196014, 943295, 3154378, 1318395, 
     3155448, 1631355, 142069, 3155442, 1718279, 3154336, 3154377, 3154317, 
     3155445, 3155451, 276075, 4300257, 2238411, 1049696, 356595, 3745414,
-    1547579, 2857709, 2857726)) %>%
+    1547579, 2857709, 2857726, 384837)) %>%
   # Exclude covers
   filter(!song_id %in% c(
     401257, 401252, 401250, 401256, 401258, 401253, 274121, 401251)) %>%
@@ -173,7 +175,10 @@ songs_1 <- songs_0 %>%
   filter(!song_id %in% c(
     2229372, 1993198, 1995570, 2230880, 2004862, 311640, 2012721, 2252949,
     1121803, 868701, 1999247, 1982992, 1634917, 2221746, 1254681, 1003511,
-    1944922)) %>%
+    1944922, 1950617)) %>%
+  # Exclude B-Sides
+  filter(!song_id %in% c(
+    309826, 308837, 308869, 757331, 308352, 756879, 756789, 756546, 757944)) %>%
   # Exclude other odd-balls
   filter(!song_id %in% c(
     1559832, 3695386, 1465765, 401323, 4433004, 4432946, 4431337, 2845669,
@@ -183,7 +188,7 @@ songs_1 <- songs_0 %>%
     311644, 1340484, 6452647, 1170883, 1226746, 4635068, 1490895, 2990344,
     311674, 926787, 6229922, 2127892, 4315531, 4006436, 756756, 308337, 
     308367, 1807195, 308375, 307363, 1845547, 1845547, 1959408, 308762,
-    6856711)) %>%
+    6856711, 311682, 861570, 308340, 308342, 307558)) %>%
   # Manually override a few song names to match the ones in Wikipedia (later)
   mutate(song = case_when(
     song == "Anagram (For Mongo)" ~ "Anagram",
@@ -191,9 +196,10 @@ songs_1 <- songs_0 %>%
     song == "Cygnus X-1, Book II: Hemispheres" ~ "Cygnus X-1 Book II: Hemispheres",
     song == "La Villa Strangiato (An Exercise in Self-Indulgence)" ~ "La Villa Strangiato",
     song == "The Larger Bowl (A Pantoum)" ~ "The Larger Bowl",
+    str_detect(song, "Body Language") ~ "Body Language",
     TRUE ~ song
+    )
   )
-)
 ```
 
 The result of all that is data frame `songs_1`. `songs_1` has `r nrow(songs_1)` rows, which seems about right. 
@@ -311,9 +317,9 @@ lyrics_2 %>% janitor::tabyl(writer) %>% janitor::adorn_totals()
 
 ## Album Names
 
-I didn't find a good way to pull the album name from Genius, so I'll scrape it from Wikipedia instead. I transformed a lot of names so that this data frame will join properly to my master data frame.
+I didn't find a good way to pull the album name from Genius, so I'll scrape it from Wikipedia instead. I transformed a lot of names so that this data frame will join properly to my master data frame. I’m hiding the chunk for aesthetics.
 
-```{r}
+```{r class.source = 'fold-hide'}
 # Rush -------------------------------------------------------------------------
 rush_wiki_xml <- read_html("https://en.wikipedia.org/wiki/List_of_songs_recorded_by_Rush")
 
@@ -348,7 +354,11 @@ queen_albums <- queen_wiki_xml %>%
       Song == "You And I" ~ "You and I",
       Song == "Hang On in There" ~ "Hang on in There",
       TRUE ~ Song),
-    Album = str_trim(`Original release`, side = "both")
+    Year = if_else(Year == 19731974, as.integer(1974), Year),
+    Year = if_else(Year == 1979, as.integer(1980), Year),
+    Year = if_else(Year == 1985, as.integer(1986), Year),
+    Album = str_trim(`Original release`, side = "both"),
+    Album = if_else(Album == "Queen / Queen II", "Queen II", Album)
   ) %>%
   select(song = Song, album = Album, released = Year)
 
@@ -374,6 +384,24 @@ acdc_albums <- acdc_wiki_xml %>%
       # Song == "Can't Stop Rock 'N' Roll" ~ "Can't Stop Rock 'n' Roll",
       TRUE ~ Song
     ),
+    `Album(s)` = str_remove_all(`Album(s)`, "(AC/DC Live)|(\\(Australia\\))"),
+    `Album(s)` = str_remove_all(`Album(s)`, "(Iron Man 2)|(Live at River Plate)"),
+    `Album(s)` = str_remove_all(`Album(s)`, "(Backtracks)|('74 Jailbreak)"),
+    `Album(s)` = str_remove_all(`Album(s)`, "(If You Want Blood You've Got It)"),
+    `Album(s)` = str_remove_all(`Album(s)`, "(Volts)"),
+    `Album(s)` = str_remove_all(`Album(s)`, "(\\(North America & Japan, all later releases\\))"),
+    `Album(s)` = str_remove_all(`Album(s)`, "(\\(Europe & Australia\\)|\\(Europe\\))"),
+    `Album(s)` = str_replace(`Album(s)`, "Back in BlackWho Made Who", "Back in Black"),
+    `Album(s)` = str_replace(`Album(s)`, "Dirty Deeds Done Dirt CheapLet There Be Rock", "Dirty Deeds Done Dirt Cheap"),
+    `Album(s)` = str_replace(`Album(s)`, "Dirty Deeds Done Dirt CheapWho Made Who", "Dirty Deeds Done Dirt Cheap"),
+    `Album(s)` = str_replace(`Album(s)`, "T.N.T.", "T.N.T./High Voltage"),
+    `Album(s)` = str_replace(`Album(s)`, "High Voltage", "T.N.T./High Voltage"),
+    `Album(s)` = str_replace(`Album(s)`, "T.N.T./High Voltage High Voltage", "T.N.T./High Voltage"),
+    `Album(s)` = str_replace(`Album(s)`, "T.N.T./T.N.T./High Voltage", "T.N.T./High Voltage"),
+    `Album(s)` = str_replace(`Album(s)`, "T.N.T./High VoltageDirty Deeds Done Dirt Cheap", "T.N.T./High Voltage"),
+    `Album(s)` = str_replace(`Album(s)`, "T.N.T./High VoltageHigh Voltage", "T.N.T./High Voltage"),
+    `Album(s)` = str_replace(`Album(s)`, "Fly on the WallWho Made Who", "Fly on the Wall"),
+    `Album(s)` = str_replace(`Album(s)`, "For Those About to Rock We Salute YouWho Made Who", "For Those About to Rock We Salute You"),
     Album = str_trim(`Album(s)`, side = "both")
   ) %>%
   select(song = Song, album = Album, released = `Year of first release`)
@@ -442,6 +470,8 @@ lyrics_lines <- lyrics_4 %>%
   group_by(song_id) %>%
   mutate(line_no = row_number()) %>%
   ungroup() %>%
+  # remove empty lines
+  filter(lyrics != "") %>%
   select(song_id, line_no, lyrics)
 
 lyrics_5 <- lyrics_4 %>%

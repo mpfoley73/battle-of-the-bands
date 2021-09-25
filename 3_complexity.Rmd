@@ -23,69 +23,324 @@ library(tidytext)
 library(plotly)
 library(glue)
 library(textstem)
+library(quanteda)
+library(quanteda.textstats)
 
 lyrics <- readRDS("./2_lyrics.Rds")
 lyrics_lines <- readRDS("./1_lyrics_lines.Rds")
+
+band_palette <- c("Queen" = "lightgoldenrod", "Rush" = "darkseagreen", "AC/DC" = "slategray1")
 ```
+
+> Section 3 of my [Battle of the Bands](https://mpfoley73.github.io/battle-of-the-bands/) text mining project compares the lyrical complexity from songs by the writers from Queen, Rush, and AC/DC. Text complexity measures are common in assessing age-appropriate reading material in schools, and in refining advertising content. They work less well for poetry and song lyrics where delineated sentences are often absent, but are still effective for comparative analysis. Neil Peart emerges as the clear winner here, primarily due to his tendency toward using long words. Brian May earned an honorable mention for textual richness. 
 
 ## Background
 
-A recent HBR article featured a [text analysis of employee performance evaluations](https://hbr.org/2021/04/how-one-company-worked-to-root-out-bias-from-performance-reviews?autocomplete=true) in which the researchers measured text _complexity_. Text complexity measures are used in education to evaluate a book's required reading level. In the HBR article, the researches used complexity as a measure of the rigor and thoughtfulness that went into each performance evaluation. Text 
+A recent HBR article featured a [text analysis of employee performance evaluations](https://hbr.org/2021/04/how-one-company-worked-to-root-out-bias-from-performance-reviews?autocomplete=true) in which the researchers measured text _complexity_. Text complexity measures are used in education to evaluate a book's required reading level. In the HBR article, the researches used complexity as a measure of the rigor and thoughtfulness that went into each performance evaluation. The concept may not transfer perfectly to song lyrics. Longer thoughts and more precise language may not make for a better or more artistic song. Complexity is at least suggestive of how eruditely the writer approached the subject in the song. 
 
-I Googled "measuring text complexity" to see if this might be an option for characterizing songs. It is! Celine Van den Rul wrote a tutorial in [Towards Data Science](https://towardsdatascience.com/linguistic-complexity-measures-for-text-nlp-e4bf664bd660) showing how to use the **quanteda** package to measure _readability_ in terms of sentence length and syllables per word, and _richness_ in terms of distinct words. Another article on the [Illinois Sate Board of Education](https://www.isbe.net/Documents/5-determining-text-complexity.pdf) site discusses text complexity more broadly, including qualitative, quantitative, and "reader and task" dimensions of complexity. I'll put aside the qualitative and "reader and task" dimensions because they are manual coding exercises that I'm not qualified (or inclined) to tackle yet. For the quantitative measures, they discuss the Flesch-Kincaid test (available in **quanteda**) which analyzes word and sentence length (longer words and sentences are more complex). They also discuss the Dale-Chall readability formula which looks at the proportion of less-familiar words. The article also discusses the Lexile framework and the Coh-Metrix report, but these two appear to be proprietary and difficult to reproduce. Maybe an option for a more in-depth analysis. This [Wikipedia](https://en.wikipedia.org/wiki/Dale%E2%80%93Chall_readability_formula) article on the Dale-Chall readability formula outlines a straight-forward formula for complexity based on the difficult word proportion, and even links to an easily downloadable list of [familiar words](https://countwordsworth.com/download/DaleChallEasyWordList.txt) to segment the lexicon. 
+There are some online resources an R packages that are helpful. Celine Van den Rul wrote a tutorial in [Towards Data Science](https://towardsdatascience.com/linguistic-complexity-measures-for-text-nlp-e4bf664bd660) showing how to use the **quanteda** package to measure _readability_ in terms of sentence length and syllables per word, and _richness_ in terms of distinct words. An article at the [Illinois State Board of Education](https://www.isbe.net/Documents/5-determining-text-complexity.pdf) discusses text complexity more broadly, including qualitative, quantitative, and "reader and task" dimensions of complexity. The qualitative and "reader and task" dimensions are manual coding exercises that I'm not qualified (or inclined) to tackle yet, but the quantitative measures are within my grasp. The Flesch-Kincaid test (available in the **quanteda** package) analyzes word and sentence length (longer words and sentences are more complex). The Dale-Chall readability formula measures the proportion of less-familiar words. The article also discusses the Lexile framework and the Coh-Metrix report, but these appear to be proprietary and difficult to reproduce. Maybe an option for a more in-depth analysis. 
 
-My strategy here will be to measure the complexity of Neil Peart's lyrics. Each section below calculates a complexity measure.
+Each section below calculates a complexity measure. My expectation is for the Rush songs to be the most complex because Neil Peart wrote such detailed lyrics. Queen, especially earlier songs written by Freddie Mercury, were very creative (see [The Fairy Feller's Master Stroke](https://genius.com/Queen-the-fairy-fellers-master-stroke-lyrics)). I expect Mercury will come a close second. I'm not huge fan of AC/DC, but my impression is that the songs will be simple, mostly about sex and possibly electricity.
+
+## Measuring Complexity with Quanteda
+
+**Quanteda** and companion package **quanteda.texts** calculate everything I want in a few function calls. Following Van den Rul's tutorial, I'll create a **quanteda** corpus, but first, I have one modification to make to the lyrics. The complexity measures assume your text is organized into sentences, not lines of lyrics. I'll make an assumption that lines are approximately sentences and collapse the lines with period separators.
+
+```{r}
+lyrics_1 <- lyrics_lines %>% 
+  group_by(song_id) %>%
+  mutate(lyrics_sentences = paste(lyrics, collapse = ". ")) %>%
+  select(-c(line_no, lyrics)) %>%
+  unique()
+```
+
+Now I can create the corpus.
+
+```{r}
+lyrics_corpus <- lyrics_1 %>% 
+  quanteda::corpus(text_field = "lyrics_sentences", docid_field = "song_id")
+```
+
+Van den Rul explains that the most popular ways to evaluate text complexity are _readability_ and _richness_ measures. Readability measures use sentence length and word length as indicators of complexity. Richness measures use vocabulary diversity as indicators of complexity. Package **quanteda.textstats** supports both. The help file for the `textstat_readability()` lists a myriad of readability measures. I'll use five.
+
+```{r}
+readability <- textstat_readability(
+  lyrics_corpus, 
+  measure = c(
+    "meanSentenceLength",
+    "meanWordSyllables", 
+    "Flesch", 
+    "Flesch.Kincaid", 
+    "Dale.Chall"
+  )
+)
+```
+
+`textstat_lexdiv()` has several richness measures. Van den Rul discusses just TTR, so I'll stick with it. The richness measures operate on document-term matrices, so I need to create one first.
+
+```{r collapse=TRUE}
+lyrics_dtm <- lyrics_corpus %>%
+  tokens(
+    remove_punct = TRUE,
+    remove_symbols = TRUE,
+    remove_numbers = TRUE,
+    remove_url = TRUE,
+    split_hyphens = TRUE,
+    verbose = TRUE
+  )
+
+richness <- textstat_lexdiv(lyrics_dtm, measure = "TTR")
+```
+
+I'll attach these measures to my lyrics dataset for examination, then dive in to figure out what they mean!
+
+```{r}
+lyrics_2 <- lyrics %>%
+  inner_join(readability %>% mutate(song_id = as.integer(document)), by = "song_id") %>%
+  inner_join(richness %>% mutate(song_id = as.integer(document)), by = "song_id") %>%
+  select(-starts_with("document")) %>%
+  rename(words_per_line = meanSentenceLength, syllables_per_word = meanWordSyllables) %>%
+  janitor::clean_names("snake")
+
+glimpse(lyrics_2)
+```
+
+```{r class.source = 'fold-hide'}
+lyrics_3 <- lyrics_2 %>%
+  arrange(band, writer) %>%
+  mutate(writer = fct_inorder(writer))
+
+summary_stats <- lyrics_3 %>% 
+  group_by(band, writer) %>%
+  summarize(.groups = "drop",
+    songs = n(),
+    asl_mean = mean(words_per_line), 
+    asl_median = median(words_per_line),
+    spw_mean = mean(syllables_per_word), 
+    spw_median = median(syllables_per_word),
+    flesch_mean = mean(flesch),
+    flesch_median = median(flesch),
+    flesch_kincaid_mean = mean(flesch_kincaid),
+    flesch_kincaid_median = median(flesch_kincaid),
+    dale_chall_mean = mean(dale_chall),
+    dale_chall_median = median(dale_chall),
+    ttr_mean = mean(ttr),
+    ttr_median = median(ttr),
+  )
+```
+
+## Visualization
+
+I will present the complexity measures with a summary table and box plots to capture the distribution. Since they presentation is consistent, I have functions to cut down on repeated code.
+
+```{r class.source = 'fold-hide'}
+plot_gt <- function(metric, title_text) {
+  summary_stats %>%
+    select(band, writer, starts_with(metric)) %>%
+    flextable::flextable() %>%
+    flextable::colformat_double(digits = 2) %>%
+    flextable::autofit() %>%
+    flextable::set_caption(title_text)  
+}
+
+plot_metric <- function(metric, title_text) {
+  p <- lyrics_3 %>%
+    ggplot(aes(x = writer, y = !!ensym(metric), color = band,
+               text = glue("<b>{song}</b> <br><br>",
+                           "Band: {band} <br>",
+                           "Album: {album} <br>",
+                           "Lyrics: {writer} <br>",
+                           "Lines: {n_lines} <br>",
+                           "Words: {n_words} <br>",
+                           "Words per Line: {scales::number(words_per_line, accuracy = .1)} <br>",
+                           "Syllables per Word: {scales::number(syllables_per_word, accuracy = .1)} <br>",
+                           "Flesch Reading Ease: {scales::number(flesch, accuracy = .1)} <br>",
+                           "Flesch-Kincaid Grade: {scales::number(flesch_kincaid, accuracy = .1)} <br>",
+                           "Dale-Chall Readability: {scales::number(dale_chall, accuracy = .1)} <br>",
+                           "Type-Token Ratio (TTR): {scales::number(ttr, accuracy = .1)} <br>"))) +
+    geom_boxplot(show.legend = FALSE) +
+    geom_jitter(width = 0.2, alpha = .6) +
+    scale_color_manual(values = band_palette) +
+    labs(x = NULL, y = NULL, title = title_text) +
+    theme_light() +
+    theme(panel.grid.major.x = element_blank())
+  
+  ggplotly(p, tooltip = "text")
+}
+
+plot_album <- function(metric, title_text) {
+  lyrics_3 %>% 
+    ggplot(aes(x = released, y = !!ensym(metric), color = band)) +
+    geom_point() +
+    geom_smooth(method = "lm", formula = "y ~ x") +
+    scale_color_manual(values = band_palette) +
+    facet_wrap(vars(writer)) +
+    theme_light() +
+    theme(legend.position = "none") +
+    labs(x = NULL, y = NULL, title = title_text)
+}
+```
+
+## Average Sentence Length
+
+Average sentence length (ASL) is just words per sentence, or in this case, words per *line*. I already calculated `n_words` and `n_lines`, so this is just their ratio. 
+
+Neil Peart had the longest average line length at `r summary_stats %>% filter(writer == "Neil Peart") %>% pull(asl_mean) %>% scales::number(accuracy = .01)` words per line followed closely behind by Queen's basist, John Deacon, at `r summary_stats %>% filter(writer == "John Deacon") %>% pull(asl_mean) %>% scales::number(accuracy = .01)` words. John Deacon's average was boosted by one outlier: [Back Chat](https://genius.com/Queen-back-chat-lyrics) was `r lyrics_3 %>% filter(song == "Back Chat") %>% pull(words_per_line) %>% scales::number(accuracy = .1)` words per line. Neil Peart had several outliers. His longest words per line was for [Bravado](https://genius.com/Rush-bravado-lyrics) at `r lyrics_3 %>% filter(song == "Bravado") %>% pull(words_per_line) %>% scales::number(accuracy = .1)` words per line. Using the median, Neil Peart still had the longest ASL at `r summary_stats %>% filter(writer == "Neil Peart") %>% pull(asl_median) %>% scales::number(accuracy = .01)` words per line, but John Deacon and Brian May were close behind. When Queen collaborated on song lyrics, they produced the least complex songs as measured by words per line (median `r summary_stats %>% filter(writer == "Queen") %>% pull(asl_median) %>% scales::number(accuracy = .01)`). Roger Taylor also used few words per line (median `r summary_stats %>% filter(writer == "Roger Taylor") %>% pull(asl_median) %>% scales::number(accuracy = .01)`). On the other had, these numbers are all fairly close. The average line of lyrics is 5-6 words long, and this tight range is probably a consequence of the rock music format.
+
+```{r class.source = 'fold-hide'}
+plot_gt(c("asl_mean", "asl_median"), title_text = "Words per Line")
+plot_metric("words_per_line", title_text = "Words per Line")
+```
+
+All of the writer had flat to decreases lyrics lines over time.  
+
+```{r class.source = 'fold-hide'}
+plot_album("words_per_line", "ASL Trend")
+```
+## Average Word Syllables
+
+I don't know how **quanteda** calculates syllables per word (SPW), especially since it processes whole documents of text at a time rather than a document-term matrix. But it does, so let's just go to the results.
+
+No surprise, Neil Peart had the longest median syllables per word (`r summary_stats %>% filter(writer == "Neil Peart") %>% pull(spw_median) %>% scales::number(accuracy = .01)`). It's striking how tighly packed the median values were for the other writers. The other median values ranged from `r summary_stats %>% filter(writer == "AC/DC") %>% pull(spw_median) %>% scales::number(accuracy = .01)` (AC/DC) to `r summary_stats %>% filter(writer == "Roger Taylor") %>% pull(spw_median) %>% scales::number(accuracy = .01)` (Roger Taylor).
+
+```{r class.source = 'fold-hide'}
+plot_gt(c("spw_mean", "spw_median"), title_text = "Syllables per Word")
+```
+
+There are a couple outlier songs. Freddie Mercury's [Mustapha](https://genius.com/Queen-mustapha-lyrics) averaged `r lyrics_3 %>% filter(song == "Mustapha") %>% pull(syllables_per_word) %>% scales::number(accuracy = .01)` syllables. Neil Peart's [Chemistry](https://genius.com/rush-chemistry-lyrics) averaged `r lyrics_3 %>% filter(song == "Chemistry") %>% pull(syllables_per_word) %>% scales::number(accuracy = .01)` syllables.
+
+```{r class.source = 'fold-hide'}
+plot_metric("syllables_per_word", title_text = "Syllables per Word")
+```
+
+Syllables per word did not change much over time, although earlier songs for Freddie Mercury and Neil Peart had more variation.
+
+```{r class.source = 'fold-hide'}
+plot_album("syllables_per_word", "SPD Trend")
+```
+
+## Flesch
+
+Flesch's Reading Ease score (Flesch) combines the first two measures. Flesch scores usually range from 0 to 100, although from the formula below you can see how any number under 206.835, including negative numbers, is possible. In general, the lower the score, the more difficult the text is to read.
+
+$$\mathrm{Flesch} = 206.835 - (1.015 \cdot \mathrm{ASL}) - \left(84.6 \cdot \mathrm{SPW}\right)$$
+where ASL again is average sentence length (words per line), and SPW is average syllables per word. Flesch's Reading Ease scores decrease with longer sentences and longer words. Scores between 60-80 are generally understood by 12-15 year olds (see [WebFX](https://www.webfx.com/tools/read-able/flesch-kincaid.html)). For complexity, I'm looking for _smaller_ Flesch values.
+
+Neil Peart's lyrics were the _least_ easy to read (median `r summary_stats %>% filter(writer == "Neil Peart") %>% pull(flesch_median) %>% scales::number(accuracy = .1)`). AC/DC and Brian May wrote the _easiest_ to read lyrics (Brian May `r summary_stats %>% filter(writer == "Brian May") %>% pull(flesch_median) %>% scales::number(accuracy = .1)`, AC/DC `r summary_stats %>% filter(writer == "AC/DC") %>% pull(flesch_median) %>% scales::number(accuracy = .1)`).
+
+```{r class.source = 'fold-hide'}
+plot_gt(c("flesch_mean", "flesch_median"), title_text = "Flesch Reading Ease Score")
+```
+
+Equating lines of text with sentences lowers the measured average sentence length. That's why these Flesch scores are ridiculously high. The measure is still valuable as a comparison of the relative complexity of songs. 
+
+Flesch weights syllables per word more highly than words per sentence. That is evident in Freddie Mercury's outlier, Mustapha. Mustapha had the lowest ASL (`r lyrics_3 %>% filter(song == "Mustapha") %>% pull(words_per_line) %>% scales::number(accuracy = .01)`) and highest SPW (`r lyrics_3 %>% filter(song == "Mustapha") %>% pull(syllables_per_word) %>% scales::number(accuracy = .01)`). The combined effect was the _lowest_ Flesch score (`r lyrics_3 %>% filter(song == "Mustapha") %>% pull(flesch) %>% scales::number(accuracy = .1)`). The same was true for Neil Peart's Chemistry. It had an ASL of `r lyrics_3 %>% filter(song == "Chemistry") %>% pull(words_per_line) %>% scales::number(accuracy = .01)` and SPW of `r lyrics_3 %>% filter(song == "Chemistry") %>% pull(syllables_per_word) %>% scales::number(accuracy = .01)`, resulting in a low Flesch score of `r lyrics_3 %>% filter(song == "Chemistry") %>% pull(flesch) %>% scales::number(accuracy = .1)`.
+
+```{r class.source = 'fold-hide'}
+plot_metric("flesch", title_text = "Flesch Reading Ease Score")
+```
+
+Flesch scores did not change much for any of the writers. No surprise since ASL and SPD did not have a strong time component.
+
+```{r class.source = 'fold-hide'}
+plot_album("flesch", "Flesch Trend")
+```
 
 ## Flesch-Kincaid
 
-## Dale-Chall Readability
+The Flesch-Kincaid Grade Level is the school grade attainment needed to comprehend the text. For reference, most news publications communicate at a seventh grade level. As Flesch did, this metric is a straightforward combination of ASL and SPW.
 
-The Dale-Chall readability measure attempts to be more clever than the Flesch-Kincaid measure. In their 1948 article, *A Formula for Predicting Readability*, Edgar Dale and Jeanne Chall compiled a list of 763 words that 80% of fourth-graders were familiar with.^[See this [Wikipedia](https://en.wikipedia.org/wiki/Dale%E2%80%93Chall_readability_formula) article.] A 1995 article extended the list to 3,000 words. You can download the list [here](http://countwordsworth.com/download/DaleChallEasyWordList.txt). Let's do it!
+$$\mathrm{Flesch-Kincaid} = 0.39 \cdot \mathrm{ASL} + 11.8 \cdot \mathrm{SPW} - 15.59$$
 
-```{r message=FALSE}
-# Only download this once
-if (exists("./3_dale_chall_3k.Rds")) {
-  dalechall3k <- readRDS("./3_dale_chall_3k.Rds")
-} else {
-  dalechall3k <- readr::read_tsv(
-    url("https://countwordsworth.com/download/DaleChallEasyWordList.txt"),
-    col_names = c("word")
-  ) %>%
-    mutate(is_familiar = 1)
-  saveRDS(dalechall3k, "./3_dale_chall_3k.Rds")
-}
+Like Flesch, Flesch-Kincaid weights syllables per word highly. Neil Peart's lyrics had by far the highest median grade level (grade `r summary_stats %>% filter(writer == "Neil Peart") %>% pull(flesch_kincaid_median) %>% scales::number(accuracy = .01)`). The second highest was Roger Taylor (grade `r summary_stats %>% filter(writer == "Roger Taylor") %>% pull(flesch_kincaid_median) %>% scales::number(accuracy = .01)`). Brian May had a remarkably low median grade (`r summary_stats %>% filter(writer == "Brian May") %>% pull(flesch_kincaid_mean) %>% scales::number(accuracy = .01)`). 
 
-# sample of 30 familiar words
-sample(dalechall3k$word, 30)
+Obviously, equating lines of lyrics with sentences results in absurdly low grade level estimates. Second graders reading Neil Peart? 
+
+```{r class.source = 'fold-hide'}
+plot_gt(c("flesch_kincaid_mean", "flesch_kincaid_median"), title_text = "Flesch-Kincaid Grade Level")
 ```
 
-I'll add familiar/difficult word counts as metadata to to my lyrics data frames.
+```{r class.source = 'fold-hide'}
+plot_metric("flesch_kincaid", title_text = "Flesch-Kincaid Grade Level")
+```
+
+Flesch scores did not change much for any of the writers. Again, no surprise.
+
+```{r class.source = 'fold-hide'}
+plot_album("flesch_kincaid", "Flesch-Kincaid Trend")
+```
+
+## Dale-Chall
+
+In their 1948 article, *A Formula for Predicting Readability*, Edgar Dale and Jeanne Chall compiled a list of 763 words that 80% of fourth-graders were familiar with.^[See this [Wikipedia](https://en.wikipedia.org/wiki/Dale%E2%80%93Chall_readability_formula) article.] A 1995 article extended the list to 3,000 words. I found the list [here](http://countwordsworth.com/download/DaleChallEasyWordList.txt). The Dale-Chall readability score decreases with the proportion of non-familiar (PNF) words and average words per sentence. 
+
+$$\mathrm{Dale-Chall} = 64 - (0.95 \cdot 100 \cdot \mathrm{PNF}) - (0.69 \cdot \mathrm{ASL})$$
+where PNF is the proportion of words that are not in the list of 3,000 familiar words, and ASL is the average sentence length (in words).
+
+The lowest median Dale-Chall scores were for Queen (`r summary_stats %>% filter(writer == "Queen") %>% pull(dale_chall_median) %>% scales::number(accuracy = .1)`) and Neil Peart (`r summary_stats %>% filter(writer == "Neil Peart") %>% pull(dale_chall_median) %>% scales::number(accuracy = .1)`). The highest was for Brian May (`r summary_stats %>% filter(writer == "Brian May") %>% pull(dale_chall_median) %>% scales::number(accuracy = .1)`) with John Deacon (`r summary_stats %>% filter(writer == "John Deacon") %>% pull(dale_chall_median) %>% scales::number(accuracy = .1)`) a close second. Surprisingly, Freddie Mercury was in the middle (`r summary_stats %>% filter(writer == "Freddie Mercury") %>% pull(dale_chall_median) %>% scales::number(accuracy = .1)`)
+
+```{r class.source = 'fold-hide'}
+plot_gt(c("dale_chall_mean", "dale_chall_median"), title_text = "Dale-Chall Readability")
+```
+
+```{r class.source = 'fold-hide'}
+plot_metric("dale_chall", title_text = "Dale-Chall Readability")
+```
+
+Freddie Mercury's Mustapha is an interesting outlier. It has words in [Arabic, Hebrew, Farsi, and Avestan](https://genius.com/Queen-mustapha-lyrics), none of which are in the list of 3,000 familiar words. That's not really fare. I could pull that song out of the data set, but taking the median value reduces sensitivity to outliers like this. Incidentally, Brian May from Queen wrote a couple songs featuring other languages, [Las Palaras de Amor](https://genius.com/Queen-las-palabras-de-amor-the-words-of-love-lyrics) (Spanish) and [Teo Torriatte](https://genius.com/Queen-teo-torriatte-let-us-cling-together-lyrics) (Japanese), but they only include a few lines of non-English.
+
+Dale-Chall readability was flat to rising for all of the writers.
+
+```{r class.source = 'fold-hide'}
+plot_album("dale_chall", "Dale-Chall Trend")
+```
+
+## TTR
+
+The Type-Token Ratio (TTR) is the ratio of the number of types (count of distinct words) divided by the number of tokens (count of all words). It measures how varied (rich) the text is. 
+
+$$\mathrm{TTR} = \mathrm{Unique} / \mathrm{Total}$$
+
+Brian May had the highest median TTR (`r summary_stats %>% filter(writer == "Brian May") %>% pull(ttr_median) %>% scales::number(accuracy = .01)`). Neil Peart and John Deacon were close behind with `r summary_stats %>% filter(writer == "Neil Peart") %>% pull(ttr_median) %>% scales::number(accuracy = .01)`. Roger Taylor had the lowest text richness (`r summary_stats %>% filter(writer == "Roger Taylor") %>% pull(ttr_median) %>% scales::number(accuracy = .01)`).
+
+```{r class.source = 'fold-hide'}
+plot_gt(c("ttr_mean", "ttr_median"), title_text = "Type-Token Ratio (TTR)")
+```
+
+The least textually rich song was Freddie Mercury's [Body Language](https://genius.com/Queen-body-language-lyrics) (`r lyrics_3 %>% filter(song == "Body Language") %>% pull(ttr) %>% scales::number(accuracy = .01)`). The richest was Queen's [Bijou](https://genius.com/Queen-bijou-lyrics) (`r lyrics_3 %>% filter(song == "Bijou") %>% pull(ttr) %>% scales::number(accuracy = .01)`), but it was only 31 words. Second richest was Neil Peart's [Chain Lightning](https://genius.com/Rush-chain-lightning-lyrics) (`r lyrics_3 %>% filter(song == "Chain Lightning") %>% pull(ttr) %>% scales::number(accuracy = .01)`).
+
+```{r class.source = 'fold-hide'}
+plot_metric(ttr, "Type-Token Ratio (TTR)")
+```
+
+AC/DC and Brian May (and perhaps Freddie Mercury) had flat TTR scores over time, but the other four writers had falling scores.
+
+```{r class.source = 'fold-hide'}
+plot_album("ttr", "TTR Trend")
+```
+
+## Summary
+
+Let's take stock. Neil Peart songs were relatively lyric heavy in terms of how many **words per line**, but Brian May and John Deacon were not far behind. Roger Taylor and Freddie Mercury were on the low end, and when Queen collaborated, they used few words per line. On the whole, I judge loquaciousness a three way tie: **Peart, Deacon, May**.
+
+Neil Peart's words had a much higher **syllables per word**. Whereas the median for all other writers fell within a very narrow band around 1.21, Neil Peart had a whopping of `r summary_stats %>% filter(writer == "Neil Peart") %>% pull(spw_median) %>% scales::number(accuracy = .01)`. Peart had a large vocabulary and that is evident from this measure. Winner: **Neil Peart**.
+
+**Flesch's Reading Ease** Score combines words per line and syllables per line into a single score. It weights syllables more than words, so Neil Peart had the lowest score here (lower means more complex). Neil Peart's median Flesch score was `r summary_stats %>% filter(writer == "Neil Peart") %>% pull(flesch_median) %>% scales::number(accuracy = .1)` while everyone else ranged from `r summary_stats %>% filter(writer != "Neil Peart") %>% summarize(flesch_min = min(flesch_median)) %>% pull(flesch_min) %>% scales::number(accuracy = .1)` to `r summary_stats %>% filter(writer != "Neil Peart") %>% summarize(flesch_max = max(flesch_median)) %>% pull(flesch_max) %>% scales::number(accuracy = .1)`. Winner: **Neil Peart**.
+
+**Flesch-Kincaid's** Grade Level score is similar to Flesch, except complex text results in *higher* grades. Peart's proclivity for polysyllabic words effectuated a transcendent median Flesch-Kincaid score of `r summary_stats %>% filter(writer == "Neil Peart") %>% pull(flesch_kincaid_median) %>% scales::number(accuracy = .01)`. Winner: **Neil Peart**.
+
+**Dale-Chall** factors the proportion of unfamiliar words in the song (lower score means more complex). Surprisingly, Queen had the most complex Dale-Chall median score (`r summary_stats %>% filter(writer == "Neil Peart") %>% pull(dale_chall_median) %>% scales::number(accuracy = .1)`), virtually tied with Neil Peart, and Freddie Mercury was only in the middle of the pack (`r summary_stats %>% filter(writer == "Freddie Mercury") %>% pull(flesch_median) %>% scales::number(accuracy = .1)`). Winners: **Queen** and **Neil Peart**.
+
+Brian May edged out Neil Peart and John Deacon for the most textually rich lyrics measured by **TTR**. May scored a median TTR of `r summary_stats %>% filter(writer == "Brian May") %>% pull(ttr_median) %>% scales::number(accuracy = .01)`. Winner: **Brian May**.
 
 ```{r}
-song_words <- lyrics %>% 
-  unnest_tokens(output = "word", input = "lyrics", token = "words") %>%
-  count(song_id, word) %>%
-  mutate(lemmatized = lemmatize_words(word))
-
-song_difficult_words <- song_words %>%
-  # left_join(dalechall3k, by = "word") %>%
-  left_join(dalechall3k, by = c("lemmatized" = "word")) %>%
-  replace_na(list(is_familiar = 0)) %>%
-  mutate(n_familiar = n * is_familiar,
-         n_difficult = n - n_familiar)
-
-song_difficult_words_smry <- song_difficult_words %>%
-  group_by(song_id) %>%
-  summarize(.groups = "drop", n_difficult_words = sum(n_difficult))
-
-lyrics_1 <- lyrics %>%
-  left_join(song_difficult_words_smry, by = c("song_id"))
-
-lyrics_2 <- lyrics_1 %>%
-  mutate(dale_chall = 0.1579 * (n_difficult_words / n_words * 100) + 0.0496 * (n_words / n_lines))
-
-lyrics_2 %>% select(song, dale_chall, lyrics) %>% arrange(desc(dale_chall))
-
+lyrics_3 %>% 
+  select(writer, words_per_line:ttr) %>%
+  gtsummary::tbl_summary(
+    by = "writer",
+    statistic = list(c(words_per_line, syllables_per_word, flesch, 
+                       flesch_kincaid, dale_chall, ttr) ~ "{median}"))
 ```
 
-
+<br><br>
+It is interesting to note that the trend of most measures were flat or moving mildly toward less-complex songs. This is somewhat at odds with my intuition. I expected Freddie Mercury's songs to become dramatically less complex over time, and Neil Peart's to become gradually *more* complex. Neither were true.
