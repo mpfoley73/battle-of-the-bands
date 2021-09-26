@@ -10,7 +10,7 @@ output:
     toc: true
     toc_float: true
     highlight: haddock
-    code_folding: hide
+    code_folding: show
 ---
 
 ```{r setup, include=FALSE}
@@ -22,75 +22,217 @@ library(tidyverse)
 library(tidytext)
 library(plotly)
 library(glue)
+library(stm)
+library(janitor)
 
-lyrics <- readRDS("./lyrics.Rds")
+lyrics <- readRDS("./3_lyrics.Rds")
+lyrics_lines <- readRDS("./1_lyrics_lines.Rds")
 
-palette <- c("cool_gray" = "#3B3730", "sage" = "#9D9480", "nude" = "#8C7460")
+band_palette <- c("Queen" = "lightgoldenrod", "Rush" = "darkseagreen", "AC/DC" = "slategray1")
 ```
 
-```{r}
-n_distinct(lyrics$album)
-lyrics %>% 
-  count(released, album) %>%
-  mutate(released = if_else(album == "Fly by Night", as.integer(1974), released)) %>%
-  ggplot(aes(x = released, y = n)) +
-  geom_col(fill = palette["nude"]) +
-  geom_text(aes(label = album, y = 0.5), angle = 90, hjust = "bottom", vjust = .25, 
-            size = 3, color = "gray99") +
-  theme_light() +
-  labs(x = "Release Year", y = "Songs on Album", 
-       title = glue("Neil Peart authored lyrics to {nrow(lyrics)} songs across {n_distinct(lyrics$album)} albums."),
-       subtitle = "Song Counts")
-```
+> Section 4 of my [Battle of the Bands](https://mpfoley73.github.io/battle-of-the-bands/) text mining project compares recurring topics in songs by the writers from Queen, Rush, and AC/DC. Topic models identify dominant themes in text and are useful tools for summarizing large corposes. 
 
-## Text Complexity
-
-Have Rush songs changed in _complexity_ over time? I Googled "measuring text complexity" to see how I might characterize songs. [Lexile](https://lexile.com/educators/tools-to-support-reading-at-school/tools-to-determine-a-books-complexity/) has an algorithm that measures text complexity for educators. Lexile doesn't disclose their algorithm, but they do give some direction about how to think about complexity. Their measure of complexity increases with sentence length and decreases with word frequency. 
-
-"Sentence length" is a tricky concept for song lyrics since they mostly exclude punctuation. The next best alternative may be to measure the length of the entire song. We can also divide the text into common (so-called "stop words") and complex words and count each type. A song with a high proportion of complex words could receive a higher complexity score. A variation that measures the proportion of distinct words that are complex might prove useful to mitigate the effect of repetitive choruses.
+## Wrangling
 
 ```{r}
-lyrics
-```
+lyrics_tidy <- lyrics %>%
+  
+  # remove special chars
+  mutate(lyrics_tidy = str_remove_all(lyrics, "[[:punct:]]")) %>%
+  unnest_tokens(output = "word", input = lyrics_tidy) %>%
+  
+  # in surveys, you might want to correct misspellings. that's not the case here,
+  # so I'm skipping this step
+  # left_join(
+  #   fuzzyjoin::misspellings %>% distinct(misspelling, .keep_all = TRUE),
+  #   by = c("word" = "misspelling")
+  # ) %>%
+  # mutate(word = coalesce(correct, word)) %>%
+  # select(-correct) %>%
 
-
-The average song^[Good tutorial on **ggplotly** [here](https://www.musgraveanalytics.com/blog/2018/8/24/how-to-make-ggplot2-charts-interactive-with-plotly).].
-
-```{r}
-song_word_counts <- lyrics %>% 
-  unnest_tokens(output = "word", input = "lyrics", token = "words") %>%
-  count(song_id, word) %>%
-  group_by(song_id) %>%
-  summarize(word_count = sum(n))
-
-lyrics_aug_0 <- lyrics %>%
-  inner_join(song_word_counts, by = "song_id")
-
-p <- lyrics_aug_0 %>% 
-  ggplot(aes(x = released, y = word_count, group = 1,
-             text = glue("{song_name} ({song_id})<br>",
-                         "Album: {album}<br>",
-                         "Released: {released}<br>",
-                         "Words: {word_count}"))) +
-  geom_point(color = palette["sage"]) +
-  geom_smooth(method = "lm", formula = "y ~ x", color = "goldenrod", fill = "goldenrod") +
-  labs(y = "Words in Song", x = "Release Year", 
-       title = "Word counts in songs were consistent over time.",
-       subtitle = "Linear trend line has zero slope.") +
-  theme_light()
-
-ggplotly(p, tooltip = "text")
-```
-
-## Lexicon
-
-Did Rush songs become 
-```{r}
-lyrics %>% 
-  unnest_tokens(output = "word", input = "lyrics", token = "words") %>%
+  # lemmatize words 
+  mutate(word = textstem::lemmatize_words(word, dictionary = lexicon::hash_lemmas)) %>%
+  
+  # remove stop words
   anti_join(stop_words, by = "word") %>%
-  count(album, word) %>%
-  group_by(album) %>%
-  slice_max(order_by = n, n = 5, with_ties = FALSE)
+  
+  # reconstruct the lyrics 
+  nest(word_list = word) %>%
+  mutate(lyrics_tidy = map_chr(word_list, ~ unlist(.) %>% paste(., collapse = " "))) %>%
+  select(-word_list)
 ```
+
+```{r}
+lyrics_tidy %>%
+  pivot_longer(cols = c(lyrics, lyrics_tidy)) %>%
+  select(song, value) %>%
+  head() %>%
+  flextable::as_grouped_data("song") %>% 
+  flextable::flextable() %>%
+  flextable::autofit() %>%
+  flextable::theme_vanilla() %>%
+  flextable::bg(i = ~ !is.na(song), bg = "gray80") %>%
+  flextable::border(i = c(2, 4), border.bottom = officer::fp_border()) %>%
+  flextable::border(j = 2, border.right = officer::fp_border())
+```
+
+## Exploration
+
+```{r}
+tidy_top5_plot <- function(x, title_text) {
+  x %>%
+    group_by(band, writer) %>%
+    count(token) %>%
+    mutate(token_pct = n / sum(n)) %>%
+    slice_max(order_by = token_pct, n = 5, with_ties = FALSE) %>%
+    mutate(token = reorder_within(token, token_pct, writer)) %>%
+    ggplot(aes(x = token, y = token_pct, fill = band)) +
+    geom_col() +
+    scale_color_manual(values = band_palette) +
+    scale_x_reordered() +
+    scale_y_continuous(labels = scales::percent_format(accuracey = 1)) +
+    facet_wrap(facets = vars(writer), scales = "free_y") +
+    coord_flip() +
+    theme_light() +
+    theme(legend.position = "none") +
+    labs(x = NULL, y = "frequency", title = title_text)
+}
+
+# This is a first attempt at a word count. A better one comes later.
+lyrics_word <- lyrics_tidy %>%
+  unnest_tokens(output = "token", input = lyrics_tidy, token = "words")
+
+lyrics_word %>% tidy_top5_plot("Top 5 Words.")
+```
+
+I can remove some ubiquitous and non-sensical words like "ooh".
+
+```{r}
+custom_stop_words <- data.frame(token = c("ooh", "whoa"))
+
+# This is the final word count
+lyrics_word_2 <- lyrics_word %>%
+  anti_join(custom_stop_words, by = "token")
+
+lyrics_word_2 %>% tidy_top5_plot("Top 5 Words.")
+```
+
+Bigrams are easier to interpret, but also may mask ideas with variation in phrasing. 
+
+```{r}
+lyrics_bigram <- lyrics_tidy %>%
+  unnest_tokens(output = "token", input = lyrics_tidy, token = "ngrams", n = 2) %>%
+  filter(!is.na(token))
+
+lyrics_bigram %>% tidy_top5_plot("Top 5 Bigrams")
+```
+
+## Modeling
+
+Fit a structural topic model (STM). Following the procedure from the [stm vignette](https://www.structuraltopicmodel.com/).]
+
+### Process and Prepare
+
+Process the data first. Some of this is overalap with the processing I've just completed.
+
+```{r}
+processed <- stm::textProcessor(
+  lyrics_tidy$lyrics_tidy,
+  metadata = lyrics_tidy,
+  stem = FALSE,
+  customstopwords = custom_stop_words$token
+)
+```
+
+`textProcessor()` produces a list object with three main components:
+
+* a `vocab` named vocabulary vector. My vector has `r length(processed$vocab) %>% scales::comma()` words.
+* a `documents` list of matrices, one per document. Each matrix has 2 rows of intergers. The first row is indices from the vocabulary vector; the second is their associated word counts. This is a concised representation of a document term matrix. The processing step sometimes removes a few documents that are empty after removing chaff. However, I have `r nrow(lyrics_tidy) %>% scales::comma()` rows in my data frame and `r processed$documents %>% length() %>% scales::comma()` rows in my `documents` list.
+* a `meta` metadata data frame. There is one row per document (song) = `r nrow(processed$meta)` rows.
+
+Next, "prepare" the corpus by removing infrequently used words. You can leave all words in, but in improves performance to cull out words with such low frequencies that they are unlikely to contribute to topics. The following diagnostic plot helps.
+
+```{r}
+stm::plotRemoved(processed$documents, lower.thresh = seq(1, length(processed$documents), by = 10))
+```
+
+If you remove wors appearing in less than half the songs, all of your sons will be empty. How about I require that a word appear in at least 1% of songs in the corpus in order to be included in a topic? `prepDocuments()` removes words with frequencies below your defined threshold, then updates the vocabulary, documents, and metadata.
+
+```{r}
+prepared <- stm::prepDocuments(processed$documents,
+                               processed$vocab,
+                               processed$meta,
+                               lower.thresh = length(processed$documents) * .01)
+```
+
+I didn't lose any songs - I'm still at `r prepared$documents %>% length() %>% scales::comma()` songs. The vocabulary vector shrank from `r length(processed$vocab) %>% scales::comma()` words to `r length(prepared$vocab) %>% scales::comma()` words. Here they are.
+
+```{r}
+prepared$vocab
+```
+
+### Fit the Model
+
+Most topic models represent documents as the output of a probabalistic data-generating mechanism. The model optimizes the distributoin parameters according to some criteria. The data generating mechnism is a pair of probability distributions.
+
+The first probability distribution defines topics as weighted probabilities of terms in the vocabulary vector. We will fit a model with five topics^[NO staitical reason for chooseing five topics - five is just a reasonabley small number that, through trial and error, produced a satisfying rsult. You could optimize this by specifying `K = 0`. I tried that, but `stm()` thres an error which I hnever got to the bottom of.]. This probability distribution will then be a 5 x `r length(prepared$vocab)` matrix, by convention called the _beta_matrix.
+
+The econd probability distribution defines documents as weighted probabilities of topics. You might interpret the wights as _the probability that this documet is about this topic_, ora _a measure of the associateion of this topic wwith this document_, or _a me3asure of how much this topic contributed to this document_. This probability distribution will then be a `r length(prepared$documents) %>% scales::comma()` x 5 matrix, by convention called the _gamma_matrix (or so I though - it's call _theta_ in the stm package).
+
+STM differs from other topic models in that you can fit the model with controlling variables iso that a) the beta matrix is a funcdtion of th controllin gvaraibles (*topical content*) and/or b) the gamma matrix is a function of teh controlling variables (*toipicsl prevalence*). In the topical contend model case, if you think _how_ a topic is discussed will vary by some metadata features, you may want to control for them. E.g., middle-school children might express similar thought to PhD candidates, but with different words. In the topical prevalnce model case, if you think _what_ topics are expressed will vary by some metadata features, you may want to control for them. E.g., if a survey has a likder question and associated comment question, you might expect the comment to be correlated with the liker response. That is sort of the case hre, so I will fit a prevalence wmodel with `writer` as a covariate.
+
+```{r}
+fit_prevalence <- stm::stm(
+  documents = prepared$documents,
+  vocab = prepared$vocab,
+  K = 0,
+  prevalence = ~ writer,
+  data = prepared$meta,
+  init.type = "Spectral",
+  verbose = FALSE
+)
+
+summary(fit_prevalence)
+```
+
+### Interpretation
+
+The model summary tagle above (you can also print it with `stm::labelTopics(fit_prevalence)`) shows the top wors by metric: proability, FREX, lift, and score.
+
+* **FREX** weights wors by their overall frequency and how exlusive they are to the topic.
+* **Lieft** weights words by div iding by theeir frequency in other topics, therefore giveing higher weight to wrods that appear less frequently in other topicds.
+* **Score** divides the log frequency of teh word in the topic by the log frequency of the  word in other topics.
+
+`findThoughts()` shows comments taht mapped highly to one of the topics.
+
+```{r}
+lyrics_tidy_preped <- 
+  lyrics_tidy %>%
+  # .[-processed$docs.removed, ] %>%
+  # .[-prepared$docs.removed, ] %>%
+  pull(lyrics)
+
+stm::findThoughts(fit_prevalence, n = 2, texts = lyrics_tidy_preped, topics = c(1:5)) %>%
+  pluck("docs")
+```
+
+For reporging purposes, you might want to sum it up with a title.
+
+**Topic 1** is ...
+**Topic 2** is...
+etc.
+
+```{r}
+topic_title <- tribble(
+  ~topic_num, ~topic_title,
+  "1", "is...",
+  "2", "title 2",
+  "3", "topic 3 stuff",
+  "4", "More for 4",
+  "5", "My 5"
+)
+```
+
+## Save work
 

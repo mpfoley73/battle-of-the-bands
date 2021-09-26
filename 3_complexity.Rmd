@@ -344,3 +344,12 @@ lyrics_3 %>%
 
 <br><br>
 It is interesting to note that the trend of most measures were flat or moving mildly toward less-complex songs. This is somewhat at odds with my intuition. I expected Freddie Mercury's songs to become dramatically less complex over time, and Neil Peart's to become gradually *more* complex. Neither were true.
+
+
+## Save Work
+
+Save the lyrics with complexity stats for subsequent steps.
+
+```{r}
+saveRDS(lyrics_3, "./3_lyrics.Rds")
+```
