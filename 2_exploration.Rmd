@@ -32,12 +32,17 @@ band_palette <- c("Queen" = "lightgoldenrod", "Rush" = "darkseagreen", "AC/DC" =
 
 > Section 2 of my [Battle of the Bands](https://mpfoley73.github.io/battle-of-the-bands/) text mining project is a brief exploration of the lyrics dataset to get acquainted with the data and perform any transformations that might be useful in subsequent analyses. 
 
-The dataset consists of `r nrow(lyrics)` songs spread fairly even across the three bands.
+The dataset consists of `r nrow(lyrics)` songs spread fairly even across the three bands. Queen's members collaborated on only `r lyrics %>% filter(writer == "Queen") %>% nrow()` songs. Freddie Mercury and Brian May wrote most songs, but even John Deacon wrote `r lyrics %>% filter(writer == "John Deacon") %>% nrow()` songs.
 
 ```{r}
+lyrics <- lyrics %>% arrange(band, writer) %>% 
+  mutate(
+    writer = fct_inorder(writer),
+    writer = fct_relevel(writer, "Queen", after = 5)
+  )
 lyrics %>% 
-  group_by(band) %>%
-  summarize(
+  group_by(band, writer) %>%
+  summarize(.groups = "drop",
     albums = n_distinct(album),
     songs = n()
   ) %>%
@@ -86,20 +91,22 @@ lyrics %>%
 lyrics_1 <- lyrics %>%
   inner_join(lyrics_lines %>% count(song_id, name = "n_lines"), by = "song_id")
 
-lc_quant_by_band <- lyrics_1 %>%
-  split(lyrics_1$band) %>% 
+lc_quant_by_writer <- lyrics_1 %>%
+  split(lyrics_1$writer) %>% 
   lapply(function(x) quantile(x$n_lines)) %>%
-  bind_rows(.id = "band")
+  bind_rows(.id = "writer")
 
 lc_quant <- quantile(lyrics_1$n_lines)
 lc_quant_df <- lc_quant %>% as_tibble_row() %>% bind_cols(band = "Overall")
-lc_quant_tbl <- bind_rows(lc_quant_by_band, lc_quant_df)
+lc_quant_tbl <- bind_rows(lc_quant_by_writer, lc_quant_df)
 
 shortest_songs <- lyrics_1 %>% slice_min(order_by = n_lines) %>% pull(song)
+shortest_song_writer <- lyrics_1 %>% slice_min(order_by = n_lines) %>% pull(writer)
 longest_songs <- lyrics_1 %>% slice_max(order_by = n_lines) %>% pull(song)
+longest_song_writer <- lyrics_1 %>% slice_max(order_by = n_lines) %>% pull(writer)
 ```
 
-The overall IQR of lines per song was `r lc_quant["25%"]` to `r lc_quant["75%"]` lines, and those quantiles were consistent across the bands. 
+The overall IQR of lines per song was `r lc_quant["25%"]` to `r lc_quant["75%"]` lines, and those quantiles were similar among the writers. The median song length for each writer ranged from `r min(lc_quant_tbl[, 4])` to `r max(lc_quant_tbl[, 4])` lines. Freddie Mercury and Queen had the longest median line counts, AC/DC and Brian May the shortest.
 
 ```{r}
 lc_quant_tbl %>%
@@ -108,9 +115,9 @@ lc_quant_tbl %>%
   flextable::set_caption("Song Lines Quantiles")
 ```
 
-Queen wrote the shortest songs. `r shortest_songs[1]` and `r shortest_songs[2]` where `r min(lyrics_1$n_lines)` lines. The longest song was `r longest_songs` by AC/DC (`r max(lyrics_1$n_lines)` lines).
+Brian May and Freddie Mercury wrote the shortest songs. `r shortest_songs[1]` (`r shortest_song_writer[1]`) and `r shortest_songs[2]` (`r shortest_song_writer[2]`) were `r min(lyrics_1$n_lines)` lines. The longest song was `r longest_songs` by `r longest_song_writer` (`r max(lyrics_1$n_lines)` lines).
 
-```{r}
+```{r fig.height=8}
 p <- lyrics_1 %>% 
   ggplot(aes(x = released, y = n_lines, group = as.factor(released), color = band,
              text = glue("Band: {band} <br>",
@@ -128,7 +135,7 @@ p <- lyrics_1 %>%
     x = NULL, y = "Line Count",
     title = glue("Line count IQR is {lc_quant['25%']} to {lc_quant['75%']} lines.")
   ) +
-  facet_wrap(vars(band))
+  facet_wrap(vars(writer))
 
 ggplotly(p, tooltip = "text")
 ```
@@ -145,20 +152,22 @@ word_count <- lyrics_1 %>%
 lyrics_2 <- lyrics_1 %>%
   inner_join(word_count, by = "song_id")
 
-wc_quant_by_band <- lyrics_2 %>%
-  split(lyrics_1$band) %>% 
+wc_quant_by_writer <- lyrics_2 %>%
+  split(lyrics_1$writer) %>% 
   lapply(function(x) quantile(x$n_words)) %>%
-  bind_rows(.id = "band")
+  bind_rows(.id = "writer")
 
 wc_quant <- quantile(lyrics_2$n_words)
 wc_quant_df <- wc_quant %>% as_tibble_row() %>% bind_cols(band = "Overall")
-wc_quant_tbl <- bind_rows(wc_quant_by_band, wc_quant_df)
+wc_quant_tbl <- bind_rows(wc_quant_by_writer, wc_quant_df)
 
 shortest_wc_song <- lyrics_2 %>% slice_min(order_by = n_words) %>% pull(song)
+shortest_wc_song_writer <- lyrics_2 %>% slice_min(order_by = n_words) %>% pull(writer)
 longest_wc_song <- lyrics_2 %>% slice_max(order_by = n_words) %>% pull(song)
+longest_wc_song_writer <- lyrics_2 %>% slice_max(order_by = n_words) %>% pull(writer)
 ```
 
-The overall IQR of words per song was `r wc_quant["25%"]` to `r wc_quant["75%"]` lines. AC/DC and Queen had similar quantiles, and Rush songs were about 10% longer.
+The overall IQR of words per song was `r wc_quant["25%"]` to `r wc_quant["75%"]` lines. IQRs varied among the writers by about 10%.
 
 ```{r}
 wc_quant_tbl %>%
@@ -167,9 +176,9 @@ wc_quant_tbl %>%
   flextable::set_caption("Song Words Quantiles")
 ```
 
-The IQR of words per song was `r wc_quant["25%"]` to `r wc_quant["75%"]` words. The shortest song was `r shortest_wc_song` (`r min(lyrics_2$n_words)` words). The longest song was `r longest_wc_song` at (`r max(lyrics_2$n_words)` words).
+The shortest song was `r shortest_wc_song` (`r min(lyrics_2$n_words)` words) by `r shortest_wc_song_writer`. The longest song was `r longest_wc_song` (`r max(lyrics_2$n_words)` words) by `r longest_wc_song_writer`.
 
-```{r}
+```{r fig.height=8}
 p <- lyrics_2 %>% 
   ggplot(aes(x = released, y = n_words, group = as.factor(released), color = band,
              text = glue("Band: {band} <br>",
@@ -187,7 +196,7 @@ p <- lyrics_2 %>%
     x = NULL, y = "Word Count",
     title = glue("Word count IQR is {wc_quant['25%']} to {wc_quant['75%']} words.")
   ) +
-  facet_wrap(vars(band))
+  facet_wrap(vars(writer))
 
 ggplotly(p, tooltip = "text")
 ```

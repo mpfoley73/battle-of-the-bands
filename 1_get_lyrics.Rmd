@@ -237,7 +237,8 @@ if (file.exists("./1_lyrics_raw.Rds")) {
       }),
       # Lyrics are stuffed somewhere inside a node within a class with a name
       # that starts with "Lyrics__Container".
-      lyrics_class = map_chr(class_names, ~ .[str_detect(., "Lyrics__Container")]),
+      # lyrics_class = map_chr(class_names, ~ .[str_detect(., "Lyrics__Container")]), # mistake
+      lyrics_class = map_chr(class_names, ~ .[str_detect(., "Lyrics__Root")]),
       lyrics_node = map2(genius_session, lyrics_class, ~ html_node(.x, paste0(".", .y))),
       lyrics = map_chr(lyrics_node, ~ html_text2(.)),
       # The song writer is stuffed somewhere inside a node within a class with a
@@ -275,6 +276,8 @@ lyrics_1 <- lyrics_raw %>%
     # keep new line chars, but only one. Run twice in case there are more than 2.
     lyrics = str_replace_all(lyrics, "\n\n", "\n"),
     lyrics = str_replace_all(lyrics, "\n\n", "\n"),
+    # trim footer
+    lyrics = str_remove(lyrics, "Embed\nShare URL\nCopy\nEmbed\nCopy"),
     # replace [non-space][capital] with [non-space]\n[capital]
     lyrics = str_replace_all(lyrics, cap_regex, prefix_space),
     # remove quotations markes

@@ -33,17 +33,36 @@ band_palette <- c("Queen" = "lightgoldenrod", "Rush" = "darkseagreen", "AC/DC" =
 
 > Section 4 of my [Battle of the Bands](https://mpfoley73.github.io/battle-of-the-bands/) text mining project compares recurring topics in songs by the writers from Queen, Rush, and AC/DC. Topic models identify dominant themes in text and are useful tools for summarizing large corposes. 
 
-## Wrangling
+## Background
+
+Topic modeling searches for patterns of co-occurring words in a corpus of documents. Most topic models represent documents as the output of a probabilistic data-generating mechanism. The model optimizes the distribution parameters according to some criteria. The data generating mechanism is a pair of probability distributions.
+
+The first probability distribution defines topics as weighted probabilities of terms from the vocabulary vector. The second probability distribution defines documents as weighted probabilities of topics. You might interpret the topic weights as _the probability that document x is about topic y_, or as _the degree of the association between document x and topic y_, or as _how much this topic y contributed to document x_.
+
+STM differs from other topic models in that you can fit the model with controlling variables so that a) the first probability distribution (sometimes called the beta matrix) is a function of the controlling variables (a *topical content* model) and/or b) the second probability distribution (sometimes called the gamma matrix) is a function of the controlling variables (a *topical prevalence* model). If you think _how_ a topic is discussed depends on the metadata features, control for them in a topical content model. E.g., middle-school children will discuss a topic differently form doctoral candidates. If you think _what_ topics are expressed depends on the metadata features, control for them in a topical prevalence model. E.g., a survey with and open text comment accompanying a Likert rating will probably focus on different topics for each rating level. 
+
+That is my approach here. I assume there is overlap among the song writers, but that some topics are more strongly associated with some writers than others. I wonder if I can use topic models to identify similar songs.
+
+My `lyrics` data frame consists of `r nrow(lyrics)` songs and `r ncol(lyrics)` columns. After the `lyrics` column, the remaining 8 columns are features engineered in the [text complexity](file:///C:/GitHub/battle-of-the-bands/3_complexity.html) section.
+
+```{r}
+glimpse(lyrics)
+```
+
+## N-Grams
+
+A good first approach to analyzing lyrical content is to construct unigram and bigram counts. The **tidytext** provides an easy framework for tokenizing text into unigrams, pulling out connector words and other common "stop" words, and then taking summary statistics (usually just counts). Tidytext tokenizes into bigrams too, but bigrams are less insightful if one of the words is a stop word. [Josh Vanderleest](https://www.linkedin.com/in/josh-vanderleest-6674a87b) showed me a cool trick: tokenize into unigrams, remove stop words, reassemble into a stop-free document, then tokenize into bigrams.
 
 ```{r}
 lyrics_tidy <- lyrics %>%
   
   # remove special chars
   mutate(lyrics_tidy = str_remove_all(lyrics, "[[:punct:]]")) %>%
+  
+  # create unigrams
   unnest_tokens(output = "word", input = lyrics_tidy) %>%
   
-  # in surveys, you might want to correct misspellings. that's not the case here,
-  # so I'm skipping this step
+  # no misspellings here, so I'm skipping this step
   # left_join(
   #   fuzzyjoin::misspellings %>% distinct(misspelling, .keep_all = TRUE),
   #   by = c("word" = "misspelling")
@@ -63,8 +82,11 @@ lyrics_tidy <- lyrics %>%
   select(-word_list)
 ```
 
+`lyrics_tidy` has a new column, `lyrics_tidy` that has stop words removed, and words lemmatized. Here is what Freddie Mercury's Bohemian Rhapsody looks like before and after this processing.
+
 ```{r}
 lyrics_tidy %>%
+  filter(song == "Bohemian Rhapsody") %>%
   pivot_longer(cols = c(lyrics, lyrics_tidy)) %>%
   select(song, value) %>%
   head() %>%
@@ -73,11 +95,14 @@ lyrics_tidy %>%
   flextable::autofit() %>%
   flextable::theme_vanilla() %>%
   flextable::bg(i = ~ !is.na(song), bg = "gray80") %>%
-  flextable::border(i = c(2, 4), border.bottom = officer::fp_border()) %>%
+  flextable::border(i = c(2), border.bottom = officer::fp_border()) %>%
   flextable::border(j = 2, border.right = officer::fp_border())
+
 ```
 
-## Exploration
+### Unigrams
+
+Unnesting tokens into unigrams with counts gives the following "top 5" words for each writer.
 
 ```{r}
 tidy_top5_plot <- function(x, title_text) {
@@ -103,10 +128,10 @@ tidy_top5_plot <- function(x, title_text) {
 lyrics_word <- lyrics_tidy %>%
   unnest_tokens(output = "token", input = lyrics_tidy, token = "words")
 
-lyrics_word %>% tidy_top5_plot("Top 5 Words.")
+lyrics_word %>% tidy_top5_plot("Top 5 Words (a first look).")
 ```
 
-I can remove some ubiquitous and non-sensical words like "ooh".
+"I'm" is a top-5 word for every writer except Neil Peart. Peart rarely wrote explicity about himself. There are some gibberish words like "ooh" that don't add much insight. I'll remove them and try again.
 
 ```{r}
 custom_stop_words <- data.frame(token = c("ooh", "whoa"))
@@ -115,10 +140,14 @@ custom_stop_words <- data.frame(token = c("ooh", "whoa"))
 lyrics_word_2 <- lyrics_word %>%
   anti_join(custom_stop_words, by = "token")
 
-lyrics_word_2 %>% tidy_top5_plot("Top 5 Words.")
+lyrics_word_2 %>% tidy_top5_plot("Top 5 Words (improved).")
 ```
 
-Bigrams are easier to interpret, but also may mask ideas with variation in phrasing. 
+"Love" is another prevalent word, appearing in the top-5 for everyone except Roger Taylor and Queen. AC/DC was distinctive with reference to rock 'n roll. Peart had a relatively low word frequency for his top-5, suggesting he had a wider range of words and themes in songs.
+
+### Bigrams 
+
+Bigrams are easier to interpret, but they also can mask ideas with variation in phrasing. Here are the bigrams pulled from the distilled `lyrics_tidy` column.
 
 ```{r}
 lyrics_bigram <- lyrics_tidy %>%
@@ -128,13 +157,15 @@ lyrics_bigram <- lyrics_tidy %>%
 lyrics_bigram %>% tidy_top5_plot("Top 5 Bigrams")
 ```
 
+AC/DC is all about rock 'n roll. Brian May's songs [It's Late](https://genius.com/Queen-its-late-lyrics), [Dancer](https://genius.com/Queen-dancer-lyrics), and [Sweet Lady](https://genius.com/Queen-sweet-lady-lyrics) are evident in his list. The same is true for Deacon, Queen, and Neil Peart. Songs with repeating phrases appear in the bigrams - not very interesting.
+
 ## Modeling
 
-Fit a structural topic model (STM). Following the procedure from the [stm vignette](https://www.structuraltopicmodel.com/).]
+I will fit a structural topic model (STM) following the procedure from the [stm vignette](https://www.structuraltopicmodel.com/).]
 
 ### Process and Prepare
 
-Process the data first. Some of this is overalap with the processing I've just completed.
+Process the data first. Some of this is overlap with the processing I've just completed.
 
 ```{r}
 processed <- stm::textProcessor(
@@ -147,40 +178,41 @@ processed <- stm::textProcessor(
 
 `textProcessor()` produces a list object with three main components:
 
-* a `vocab` named vocabulary vector. My vector has `r length(processed$vocab) %>% scales::comma()` words.
-* a `documents` list of matrices, one per document. Each matrix has 2 rows of intergers. The first row is indices from the vocabulary vector; the second is their associated word counts. This is a concised representation of a document term matrix. The processing step sometimes removes a few documents that are empty after removing chaff. However, I have `r nrow(lyrics_tidy) %>% scales::comma()` rows in my data frame and `r processed$documents %>% length() %>% scales::comma()` rows in my `documents` list.
-* a `meta` metadata data frame. There is one row per document (song) = `r nrow(processed$meta)` rows.
+* a `vocab` named vocabulary vector. The vector has `r length(processed$vocab) %>% scales::comma()` words.
+* a `documents` list of matrices, one per document. Each matrix has 2 rows of integers. The first row is indices from the vocabulary vector; the second is their associated word counts. This is a concise representation of a document term matrix. The processing step sometimes removes a few documents that are empty after removing chaff. However, I still have all `r processed$documents %>% length() %>% scales::comma()` rows in my `documents` list.
+* a `meta` metadata data frame. There is one row per document (`r nrow(processed$meta)` rows) containing all the song features I've collected in prior sections.
 
 Next, "prepare" the corpus by removing infrequently used words. You can leave all words in, but in improves performance to cull out words with such low frequencies that they are unlikely to contribute to topics. The following diagnostic plot helps.
 
 ```{r}
-stm::plotRemoved(processed$documents, lower.thresh = seq(1, length(processed$documents), by = 10))
+stm::plotRemoved(
+  processed$documents, 
+  lower.thresh = seq(1, length(processed$documents), by = 10)
+)
 ```
 
-If you remove wors appearing in less than half the songs, all of your sons will be empty. How about I require that a word appear in at least 1% of songs in the corpus in order to be included in a topic? `prepDocuments()` removes words with frequencies below your defined threshold, then updates the vocabulary, documents, and metadata.
+If you remove words appearing in less than half the songs, all songs will be empty. 1% is a conservative threshold. Only words appearing in at least 1% of songs in the corpus will be included in a topic. `prepDocuments()` removes words with frequencies below the defined threshold, then updates the vocabulary, documents, and metadata.
 
 ```{r}
-prepared <- stm::prepDocuments(processed$documents,
-                               processed$vocab,
-                               processed$meta,
-                               lower.thresh = length(processed$documents) * .01)
+prepared <- stm::prepDocuments(
+  processed$documents,
+  processed$vocab,
+  processed$meta,
+  lower.thresh = length(processed$documents) * .01
+)
 ```
 
-I didn't lose any songs - I'm still at `r prepared$documents %>% length() %>% scales::comma()` songs. The vocabulary vector shrank from `r length(processed$vocab) %>% scales::comma()` words to `r length(prepared$vocab) %>% scales::comma()` words. Here they are.
+I didn't lose any songs - I'm still at `r prepared$documents %>% length() %>% scales::comma()` songs. The vocabulary vector shrank from `r length(processed$vocab) %>% scales::comma()` words to `r length(prepared$vocab) %>% scales::comma()` words. Here are the first 100, just to get a sense.
 
 ```{r}
-prepared$vocab
+prepared$vocab[1:100]
 ```
 
 ### Fit the Model
 
-Most topic models represent documents as the output of a probabalistic data-generating mechanism. The model optimizes the distributoin parameters according to some criteria. The data generating mechnism is a pair of probability distributions.
-
-The first probability distribution defines topics as weighted probabilities of terms in the vocabulary vector. We will fit a model with five topics^[NO staitical reason for chooseing five topics - five is just a reasonabley small number that, through trial and error, produced a satisfying rsult. You could optimize this by specifying `K = 0`. I tried that, but `stm()` thres an error which I hnever got to the bottom of.]. This probability distribution will then be a 5 x `r length(prepared$vocab)` matrix, by convention called the _beta_matrix.
-
-The econd probability distribution defines documents as weighted probabilities of topics. You might interpret the wights as _the probability that this documet is about this topic_, ora _a measure of the associateion of this topic wwith this document_, or _a me3asure of how much this topic contributed to this document_. This probability distribution will then be a `r length(prepared$documents) %>% scales::comma()` x 5 matrix, by convention called the _gamma_matrix (or so I though - it's call _theta_ in the stm package).
-
-STM differs from other topic models in that you can fit the model with controlling variables iso that a) the beta matrix is a funcdtion of th controllin gvaraibles (*topical content*) and/or b) the gamma matrix is a function of teh controlling variables (*toipicsl prevalence*). In the topical contend model case, if you think _how_ a topic is discussed will vary by some metadata features, you may want to control for them. E.g., middle-school children might express similar thought to PhD candidates, but with different words. In the topical prevalnce model case, if you think _what_ topics are expressed will vary by some metadata features, you may want to control for them. E.g., if a survey has a likder question and associated comment question, you might expect the comment to be correlated with the liker response. That is sort of the case hre, so I will fit a prevalence wmodel with `writer` as a covariate.
+The **stm** package allows you to either specify the number of topics (K) to identify, or it can choose an optimal number by setting parameter `K = 0`. I'll let **stm** choose. The resulting probability distribution of topic words will then be a K x `r length(prepared$vocab)` matrix, sometimes called the _beta_matrix_. The probability distribution of song topics will be a `r length(prepared$documents) %>% scales::comma()` x K matrix, sometimes called the _gamma_matrix_ (*theta* in the **stm** package).
+ 
+I expect lyrics to be correlated with the writer, so I will fit a *prevalence* model with `writer` as a covariate.
 
 ```{r}
 fit_prevalence <- stm::stm(
@@ -198,40 +230,42 @@ summary(fit_prevalence)
 
 ### Interpretation
 
-The model summary tagle above (you can also print it with `stm::labelTopics(fit_prevalence)`) shows the top wors by metric: proability, FREX, lift, and score.
+`stm()` produced a model with 
+The model summary printed above (you can also print it with `stm::labelTopics(fit_prevalence)`) shows the top words based on four metrics: highest probability, FREX, lift, and score.
 
-* **FREX** weights wors by their overall frequency and how exlusive they are to the topic.
-* **Lieft** weights words by div iding by theeir frequency in other topics, therefore giveing higher weight to wrods that appear less frequently in other topicds.
-* **Score** divides the log frequency of teh word in the topic by the log frequency of the  word in other topics.
+* **Highest Probability** weights words by their overall frequency.
+* **FREX** weights words by their overall frequency and how exclusive they are to the topic.
+* **Lift** weights words by dividing by their frequency in other topics, therefore giving higher weight to words that appear less frequently in other topics.
+* **Score** divides the log frequency of the word in the topic by the log frequency of the word in other topics.
 
-`findThoughts()` shows comments taht mapped highly to one of the topics.
+Let's look at Topic 2:
 
 ```{r}
-lyrics_tidy_preped <- 
-  lyrics_tidy %>%
-  # .[-processed$docs.removed, ] %>%
-  # .[-prepared$docs.removed, ] %>%
-  pull(lyrics)
-
-stm::findThoughts(fit_prevalence, n = 2, texts = lyrics_tidy_preped, topics = c(1:5)) %>%
-  pluck("docs")
+stm::labelTopics(fit_prevalence, topics = 2)
 ```
 
-For reporging purposes, you might want to sum it up with a title.
+`findThoughts()` shows comments that mapped highly to the topic. I show the top 3 mappings below. Looking at the Highest Prob list, Peart's [Half the World](https://genius.com/Rush-half-the-world-lyrics) features *day*, *world*, and *half*; Peart's [Alien Shore](https://genius.com/Rush-alien-shore-lyrics) features just *world*, and ; May's [Some Day, One Day](https://genius.com/Queen-some-day-one-day-lyrics) features *day*, *hear*, and "son*. *word* and *son* appeared in none of these three songs.
+
+```{r}
+topic_thoughts <- stm::findThoughts(
+  fit_prevalence, 
+  n = 3, 
+  texts = processed$meta$lyrics, 
+  topics = 2,
+  meta = processed$meta
+)
+
+processed$meta[pluck(topic_thoughts$index, 1), ] %>% select(writer, song)
+```
+
+For reporting purposes, you might want to sum each topic up with a title. That's not going to be useful here with `r `
 
 **Topic 1** is ...
 **Topic 2** is...
 etc.
 
 ```{r}
-topic_title <- tribble(
-  ~topic_num, ~topic_title,
-  "1", "is...",
-  "2", "title 2",
-  "3", "topic 3 stuff",
-  "4", "More for 4",
-  "5", "My 5"
-)
+
 ```
 
 ## Save work

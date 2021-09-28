@@ -185,29 +185,30 @@ plot_album <- function(metric, title_text) {
 
 Average sentence length (ASL) is just words per sentence, or in this case, words per *line*. I already calculated `n_words` and `n_lines`, so this is just their ratio. 
 
-Neil Peart had the longest average line length at `r summary_stats %>% filter(writer == "Neil Peart") %>% pull(asl_mean) %>% scales::number(accuracy = .01)` words per line followed closely behind by Queen's basist, John Deacon, at `r summary_stats %>% filter(writer == "John Deacon") %>% pull(asl_mean) %>% scales::number(accuracy = .01)` words. John Deacon's average was boosted by one outlier: [Back Chat](https://genius.com/Queen-back-chat-lyrics) was `r lyrics_3 %>% filter(song == "Back Chat") %>% pull(words_per_line) %>% scales::number(accuracy = .1)` words per line. Neil Peart had several outliers. His longest words per line was for [Bravado](https://genius.com/Rush-bravado-lyrics) at `r lyrics_3 %>% filter(song == "Bravado") %>% pull(words_per_line) %>% scales::number(accuracy = .1)` words per line. Using the median, Neil Peart still had the longest ASL at `r summary_stats %>% filter(writer == "Neil Peart") %>% pull(asl_median) %>% scales::number(accuracy = .01)` words per line, but John Deacon and Brian May were close behind. When Queen collaborated on song lyrics, they produced the least complex songs as measured by words per line (median `r summary_stats %>% filter(writer == "Queen") %>% pull(asl_median) %>% scales::number(accuracy = .01)`). Roger Taylor also used few words per line (median `r summary_stats %>% filter(writer == "Roger Taylor") %>% pull(asl_median) %>% scales::number(accuracy = .01)`). On the other had, these numbers are all fairly close. The average line of lyrics is 5-6 words long, and this tight range is probably a consequence of the rock music format.
+Neil Peart had the longest average line length at `r summary_stats %>% filter(writer == "Neil Peart") %>% pull(asl_mean) %>% scales::number(accuracy = .01)` words per line. It's amusing to look at some of the outliers. AC/DC's [Can I Sit Next to You Girl](https://genius.com/Ac-dc-can-i-sit-next-to-you-girl-lyrics) averaged `r lyrics_3 %>% filter(song == "Can I Sit Next to You Girl") %>% pull(words_per_line) %>% scales::number(accuracy = .1)` words per line, [T.N.T.](https://genius.com/Ac-dc-tnt-lyrics) just `r lyrics_3 %>% filter(song == "T.N.T.") %>% pull(words_per_line) %>% scales::number(accuracy = .1)` (Oi!). The distributions are fairly symmetric, and the outliers mostly offset each other. However, I'm going to rely on the median going forward. Using the median, Neil Peart still had the longest ASL at `r summary_stats %>% filter(writer == "Neil Peart") %>% pull(asl_median) %>% scales::number(accuracy = .01)` words per line. John Deacon (`r summary_stats %>% filter(writer == "John Deacon") %>% pull(asl_median) %>% scales::number(accuracy = .01)`) and Brian May (`r summary_stats %>% filter(writer == "Brian May") %>% pull(asl_median) %>% scales::number(accuracy = .01)`) were a distant second. When Queen collaborated on song lyrics, they produced the least complex songs as measured by words per line (`r summary_stats %>% filter(writer == "Queen") %>% pull(asl_median) %>% scales::number(accuracy = .01)`).
 
 ```{r class.source = 'fold-hide'}
 plot_gt(c("asl_mean", "asl_median"), title_text = "Words per Line")
 plot_metric("words_per_line", title_text = "Words per Line")
 ```
 
-All of the writer had flat to decreases lyrics lines over time.  
+All of the writers had flat trends.  
 
 ```{r class.source = 'fold-hide'}
 plot_album("words_per_line", "ASL Trend")
 ```
+
 ## Average Word Syllables
 
 I don't know how **quanteda** calculates syllables per word (SPW), especially since it processes whole documents of text at a time rather than a document-term matrix. But it does, so let's just go to the results.
 
-No surprise, Neil Peart had the longest median syllables per word (`r summary_stats %>% filter(writer == "Neil Peart") %>% pull(spw_median) %>% scales::number(accuracy = .01)`). It's striking how tighly packed the median values were for the other writers. The other median values ranged from `r summary_stats %>% filter(writer == "AC/DC") %>% pull(spw_median) %>% scales::number(accuracy = .01)` (AC/DC) to `r summary_stats %>% filter(writer == "Roger Taylor") %>% pull(spw_median) %>% scales::number(accuracy = .01)` (Roger Taylor).
+No surprise, Neil Peart had the longest median SPW (`r summary_stats %>% filter(writer == "Neil Peart") %>% pull(spw_median) %>% scales::number(accuracy = .01)`). It's striking how tighly packed the median values were for the other writers. The other median values ranged from `r summary_stats %>% filter(writer == "AC/DC") %>% pull(spw_median) %>% scales::number(accuracy = .01)` (AC/DC) to `r summary_stats %>% filter(writer == "Queen") %>% pull(spw_median) %>% scales::number(accuracy = .01)` (Freddie Mercury and Queen).
 
 ```{r class.source = 'fold-hide'}
 plot_gt(c("spw_mean", "spw_median"), title_text = "Syllables per Word")
 ```
 
-There are a couple outlier songs. Freddie Mercury's [Mustapha](https://genius.com/Queen-mustapha-lyrics) averaged `r lyrics_3 %>% filter(song == "Mustapha") %>% pull(syllables_per_word) %>% scales::number(accuracy = .01)` syllables. Neil Peart's [Chemistry](https://genius.com/rush-chemistry-lyrics) averaged `r lyrics_3 %>% filter(song == "Chemistry") %>% pull(syllables_per_word) %>% scales::number(accuracy = .01)` syllables.
+Freddie Mercury's [Mustapha](https://genius.com/Queen-mustapha-lyrics) is an interesting outlier. It averaged `r lyrics_3 %>% filter(song == "Mustapha") %>% pull(syllables_per_word) %>% scales::number(accuracy = .01)` syllables because it repeats the word "Mustapha" throughout.
 
 ```{r class.source = 'fold-hide'}
 plot_metric("syllables_per_word", title_text = "Syllables per Word")
@@ -216,7 +217,7 @@ plot_metric("syllables_per_word", title_text = "Syllables per Word")
 Syllables per word did not change much over time, although earlier songs for Freddie Mercury and Neil Peart had more variation.
 
 ```{r class.source = 'fold-hide'}
-plot_album("syllables_per_word", "SPD Trend")
+plot_album("syllables_per_word", "SPW Trend")
 ```
 
 ## Flesch
@@ -234,13 +235,13 @@ plot_gt(c("flesch_mean", "flesch_median"), title_text = "Flesch Reading Ease Sco
 
 Equating lines of text with sentences lowers the measured average sentence length. That's why these Flesch scores are ridiculously high. The measure is still valuable as a comparison of the relative complexity of songs. 
 
-Flesch weights syllables per word more highly than words per sentence. That is evident in Freddie Mercury's outlier, Mustapha. Mustapha had the lowest ASL (`r lyrics_3 %>% filter(song == "Mustapha") %>% pull(words_per_line) %>% scales::number(accuracy = .01)`) and highest SPW (`r lyrics_3 %>% filter(song == "Mustapha") %>% pull(syllables_per_word) %>% scales::number(accuracy = .01)`). The combined effect was the _lowest_ Flesch score (`r lyrics_3 %>% filter(song == "Mustapha") %>% pull(flesch) %>% scales::number(accuracy = .1)`). The same was true for Neil Peart's Chemistry. It had an ASL of `r lyrics_3 %>% filter(song == "Chemistry") %>% pull(words_per_line) %>% scales::number(accuracy = .01)` and SPW of `r lyrics_3 %>% filter(song == "Chemistry") %>% pull(syllables_per_word) %>% scales::number(accuracy = .01)`, resulting in a low Flesch score of `r lyrics_3 %>% filter(song == "Chemistry") %>% pull(flesch) %>% scales::number(accuracy = .1)`.
+Flesch weights syllables per word more highly than words per sentence. That is evident in Freddie Mercury's outlier, Mustapha. Mustapha had one of the lowest ASL scores (`r lyrics_3 %>% filter(song == "Mustapha") %>% pull(words_per_line) %>% scales::number(accuracy = .01)` words per line) and the highest SPW score (`r lyrics_3 %>% filter(song == "Mustapha") %>% pull(syllables_per_word) %>% scales::number(accuracy = .01)` syllables per word). The combined effect was the _lowest_ Flesch score (`r lyrics_3 %>% filter(song == "Mustapha") %>% pull(flesch) %>% scales::number(accuracy = .1)`). The same was true for Neil Peart's Chemistry. It had an ASL of `r lyrics_3 %>% filter(song == "Chemistry") %>% pull(words_per_line) %>% scales::number(accuracy = .01)` and SPW of `r lyrics_3 %>% filter(song == "Chemistry") %>% pull(syllables_per_word) %>% scales::number(accuracy = .01)`, resulting in a low Flesch score of `r lyrics_3 %>% filter(song == "Chemistry") %>% pull(flesch) %>% scales::number(accuracy = .1)`.
 
 ```{r class.source = 'fold-hide'}
 plot_metric("flesch", title_text = "Flesch Reading Ease Score")
 ```
 
-Flesch scores did not change much for any of the writers. No surprise since ASL and SPD did not have a strong time component.
+Flesch scores did not change much for any of the writers. No surprise since ASL and SPW did not have a strong time component.
 
 ```{r class.source = 'fold-hide'}
 plot_album("flesch", "Flesch Trend")
@@ -252,7 +253,7 @@ The Flesch-Kincaid Grade Level is the school grade attainment needed to comprehe
 
 $$\mathrm{Flesch-Kincaid} = 0.39 \cdot \mathrm{ASL} + 11.8 \cdot \mathrm{SPW} - 15.59$$
 
-Like Flesch, Flesch-Kincaid weights syllables per word highly. Neil Peart's lyrics had by far the highest median grade level (grade `r summary_stats %>% filter(writer == "Neil Peart") %>% pull(flesch_kincaid_median) %>% scales::number(accuracy = .01)`). The second highest was Roger Taylor (grade `r summary_stats %>% filter(writer == "Roger Taylor") %>% pull(flesch_kincaid_median) %>% scales::number(accuracy = .01)`). Brian May had a remarkably low median grade (`r summary_stats %>% filter(writer == "Brian May") %>% pull(flesch_kincaid_mean) %>% scales::number(accuracy = .01)`). 
+Like Flesch, Flesch-Kincaid weights syllables per word highly. Neil Peart's lyrics had by far the highest median grade level (grade `r summary_stats %>% filter(writer == "Neil Peart") %>% pull(flesch_kincaid_median) %>% scales::number(accuracy = .01)`). The second highest was Roger Taylor (grade `r summary_stats %>% filter(writer == "Roger Taylor") %>% pull(flesch_kincaid_median) %>% scales::number(accuracy = .01)`). AC/DC and Brian May had remarkably low median grades (AC/DC `r summary_stats %>% filter(writer == "AC/DC") %>% pull(flesch_kincaid_median) %>% scales::number(accuracy = .01)`, May `r summary_stats %>% filter(writer == "Brian May") %>% pull(flesch_kincaid_median) %>% scales::number(accuracy = .01)`). 
 
 Obviously, equating lines of lyrics with sentences results in absurdly low grade level estimates. Second graders reading Neil Peart? 
 
@@ -277,7 +278,7 @@ In their 1948 article, *A Formula for Predicting Readability*, Edgar Dale and Je
 $$\mathrm{Dale-Chall} = 64 - (0.95 \cdot 100 \cdot \mathrm{PNF}) - (0.69 \cdot \mathrm{ASL})$$
 where PNF is the proportion of words that are not in the list of 3,000 familiar words, and ASL is the average sentence length (in words).
 
-The lowest median Dale-Chall scores were for Queen (`r summary_stats %>% filter(writer == "Queen") %>% pull(dale_chall_median) %>% scales::number(accuracy = .1)`) and Neil Peart (`r summary_stats %>% filter(writer == "Neil Peart") %>% pull(dale_chall_median) %>% scales::number(accuracy = .1)`). The highest was for Brian May (`r summary_stats %>% filter(writer == "Brian May") %>% pull(dale_chall_median) %>% scales::number(accuracy = .1)`) with John Deacon (`r summary_stats %>% filter(writer == "John Deacon") %>% pull(dale_chall_median) %>% scales::number(accuracy = .1)`) a close second. Surprisingly, Freddie Mercury was in the middle (`r summary_stats %>% filter(writer == "Freddie Mercury") %>% pull(dale_chall_median) %>% scales::number(accuracy = .1)`)
+The lowest median Dale-Chall scores were for Queen (`r summary_stats %>% filter(writer == "Queen") %>% pull(dale_chall_median) %>% scales::number(accuracy = .1)`). The highest was for John Deacon (`r summary_stats %>% filter(writer == "John Deacon") %>% pull(dale_chall_median) %>% scales::number(accuracy = .1)`). Surprisingly, Freddie Mercury was in the middle (`r summary_stats %>% filter(writer == "Freddie Mercury") %>% pull(dale_chall_median) %>% scales::number(accuracy = .1)`)
 
 ```{r class.source = 'fold-hide'}
 plot_gt(c("dale_chall_mean", "dale_chall_median"), title_text = "Dale-Chall Readability")
@@ -287,7 +288,7 @@ plot_gt(c("dale_chall_mean", "dale_chall_median"), title_text = "Dale-Chall Read
 plot_metric("dale_chall", title_text = "Dale-Chall Readability")
 ```
 
-Freddie Mercury's Mustapha is an interesting outlier. It has words in [Arabic, Hebrew, Farsi, and Avestan](https://genius.com/Queen-mustapha-lyrics), none of which are in the list of 3,000 familiar words. That's not really fare. I could pull that song out of the data set, but taking the median value reduces sensitivity to outliers like this. Incidentally, Brian May from Queen wrote a couple songs featuring other languages, [Las Palaras de Amor](https://genius.com/Queen-las-palabras-de-amor-the-words-of-love-lyrics) (Spanish) and [Teo Torriatte](https://genius.com/Queen-teo-torriatte-let-us-cling-together-lyrics) (Japanese), but they only include a few lines of non-English.
+Freddie Mercury's Mustapha is an interesting outlier again. It has words in [Arabic, Hebrew, Farsi, and Avestan](https://genius.com/Queen-mustapha-lyrics), none of which are in the list of 3,000 familiar words. That's not really fare. I could pull that song out of the data set, but taking the median value reduces sensitivity to outliers like this. Incidentally, Brian May wrote a couple songs featuring other languages, [Las Palaras de Amor](https://genius.com/Queen-las-palabras-de-amor-the-words-of-love-lyrics) (Spanish) and [Teo Torriatte](https://genius.com/Queen-teo-torriatte-let-us-cling-together-lyrics) (Japanese), but they only include a few lines of non-English.
 
 Dale-Chall readability was flat to rising for all of the writers.
 
@@ -301,19 +302,19 @@ The Type-Token Ratio (TTR) is the ratio of the number of types (count of distinc
 
 $$\mathrm{TTR} = \mathrm{Unique} / \mathrm{Total}$$
 
-Brian May had the highest median TTR (`r summary_stats %>% filter(writer == "Brian May") %>% pull(ttr_median) %>% scales::number(accuracy = .01)`). Neil Peart and John Deacon were close behind with `r summary_stats %>% filter(writer == "Neil Peart") %>% pull(ttr_median) %>% scales::number(accuracy = .01)`. Roger Taylor had the lowest text richness (`r summary_stats %>% filter(writer == "Roger Taylor") %>% pull(ttr_median) %>% scales::number(accuracy = .01)`).
+Brian May had the highest median TTR (`r summary_stats %>% filter(writer == "Brian May") %>% pull(ttr_median) %>% scales::number(accuracy = .01)`). Queen was close behind with `r summary_stats %>% filter(writer == "Queen") %>% pull(ttr_median) %>% scales::number(accuracy = .01)`. Freddie Mercury and Roger Taylor had the lowest text richness (`r summary_stats %>% filter(writer == "Roger Taylor") %>% pull(ttr_median) %>% scales::number(accuracy = .01)`).
 
 ```{r class.source = 'fold-hide'}
 plot_gt(c("ttr_mean", "ttr_median"), title_text = "Type-Token Ratio (TTR)")
 ```
 
-The least textually rich song was Freddie Mercury's [Body Language](https://genius.com/Queen-body-language-lyrics) (`r lyrics_3 %>% filter(song == "Body Language") %>% pull(ttr) %>% scales::number(accuracy = .01)`). The richest was Queen's [Bijou](https://genius.com/Queen-bijou-lyrics) (`r lyrics_3 %>% filter(song == "Bijou") %>% pull(ttr) %>% scales::number(accuracy = .01)`), but it was only 31 words. Second richest was Neil Peart's [Chain Lightning](https://genius.com/Rush-chain-lightning-lyrics) (`r lyrics_3 %>% filter(song == "Chain Lightning") %>% pull(ttr) %>% scales::number(accuracy = .01)`).
+The least textually rich song was AC/DC's [If You Dare](https://genius.com/Ac-dc-if-you-dare-lyrics) (`r lyrics_3 %>% filter(song == "Body Language") %>% pull(ttr) %>% scales::number(accuracy = .01)`). The richest was Queen's [Bijou](https://genius.com/Queen-bijou-lyrics) (`r lyrics_3 %>% filter(song == "Bijou") %>% pull(ttr) %>% scales::number(accuracy = .01)`), but it was only 31 words. The richest song that was several lines long was Neil Peart's [Jacob's Ladder](https://genius.com/Rush-jacobs-ladder-lyrics) (`r lyrics_3 %>% filter(song == "Jacob's Ladder") %>% pull(ttr) %>% scales::number(accuracy = .01)`).
 
 ```{r class.source = 'fold-hide'}
 plot_metric(ttr, "Type-Token Ratio (TTR)")
 ```
 
-AC/DC and Brian May (and perhaps Freddie Mercury) had flat TTR scores over time, but the other four writers had falling scores.
+AC/DC and Freddie Mercury had flat TTR scores over time, but the other writers had falling scores.
 
 ```{r class.source = 'fold-hide'}
 plot_album("ttr", "TTR Trend")
@@ -321,17 +322,17 @@ plot_album("ttr", "TTR Trend")
 
 ## Summary
 
-Let's take stock. Neil Peart songs were relatively lyric heavy in terms of how many **words per line**, but Brian May and John Deacon were not far behind. Roger Taylor and Freddie Mercury were on the low end, and when Queen collaborated, they used few words per line. On the whole, I judge loquaciousness a three way tie: **Peart, Deacon, May**.
+Let's take stock. Neil Peart songs were relatively lyric heavy in terms of how many **words per line**, but Brian May and John Deacon were not far behind. When Queen collaborated, they used few words per line. Winner: **Peart**.
 
-Neil Peart's words had a much higher **syllables per word**. Whereas the median for all other writers fell within a very narrow band around 1.21, Neil Peart had a whopping of `r summary_stats %>% filter(writer == "Neil Peart") %>% pull(spw_median) %>% scales::number(accuracy = .01)`. Peart had a large vocabulary and that is evident from this measure. Winner: **Neil Peart**.
+Neil Peart had by far the highest median **syllables per word**. Whereas the median for all other writers fell within a very narrow band around `r summary_stats %>% filter(writer != "Neil Peart") %>% summarize(wm = weighted.mean(spw_median, songs)) %>% pull(wm) %>% scales::number(accuracy = .01)`, Neil Peart had a whopping of `r summary_stats %>% filter(writer == "Neil Peart") %>% pull(spw_median) %>% scales::number(accuracy = .01)`. Peart had a large vocabulary and that is evident from this measure. Winner: **Neil Peart**.
 
-**Flesch's Reading Ease** Score combines words per line and syllables per line into a single score. It weights syllables more than words, so Neil Peart had the lowest score here (lower means more complex). Neil Peart's median Flesch score was `r summary_stats %>% filter(writer == "Neil Peart") %>% pull(flesch_median) %>% scales::number(accuracy = .1)` while everyone else ranged from `r summary_stats %>% filter(writer != "Neil Peart") %>% summarize(flesch_min = min(flesch_median)) %>% pull(flesch_min) %>% scales::number(accuracy = .1)` to `r summary_stats %>% filter(writer != "Neil Peart") %>% summarize(flesch_max = max(flesch_median)) %>% pull(flesch_max) %>% scales::number(accuracy = .1)`. Winner: **Neil Peart**.
+**Flesch's Reading Ease** Score combines words per line and syllables per line into a single score. It weights syllables more than words, so Neil Peart dominated with the lowest score (lower means more complex). Neil Peart's median Flesch score was `r summary_stats %>% filter(writer == "Neil Peart") %>% pull(flesch_median) %>% scales::number(accuracy = .1)` while everyone else ranged from `r summary_stats %>% filter(writer != "Neil Peart") %>% summarize(flesch_min = min(flesch_median)) %>% pull(flesch_min) %>% scales::number(accuracy = .1)` to `r summary_stats %>% filter(writer != "Neil Peart") %>% summarize(flesch_max = max(flesch_median)) %>% pull(flesch_max) %>% scales::number(accuracy = .1)`. Winner: **Neil Peart**.
 
 **Flesch-Kincaid's** Grade Level score is similar to Flesch, except complex text results in *higher* grades. Peart's proclivity for polysyllabic words effectuated a transcendent median Flesch-Kincaid score of `r summary_stats %>% filter(writer == "Neil Peart") %>% pull(flesch_kincaid_median) %>% scales::number(accuracy = .01)`. Winner: **Neil Peart**.
 
-**Dale-Chall** factors the proportion of unfamiliar words in the song (lower score means more complex). Surprisingly, Queen had the most complex Dale-Chall median score (`r summary_stats %>% filter(writer == "Neil Peart") %>% pull(dale_chall_median) %>% scales::number(accuracy = .1)`), virtually tied with Neil Peart, and Freddie Mercury was only in the middle of the pack (`r summary_stats %>% filter(writer == "Freddie Mercury") %>% pull(flesch_median) %>% scales::number(accuracy = .1)`). Winners: **Queen** and **Neil Peart**.
+**Dale-Chall** factors the proportion of unfamiliar words in the song (lower score means more complex). Surprisingly, Queen had the most complex Dale-Chall median score (`r summary_stats %>% filter(writer == "Queen") %>% pull(dale_chall_median) %>% scales::number(accuracy = .1)`). Winner: **Queen**.
 
-Brian May edged out Neil Peart and John Deacon for the most textually rich lyrics measured by **TTR**. May scored a median TTR of `r summary_stats %>% filter(writer == "Brian May") %>% pull(ttr_median) %>% scales::number(accuracy = .01)`. Winner: **Brian May**.
+Brian May edged out Queen and John Deacon for the most textually rich lyrics measured by **TTR**. May scored a median TTR of `r summary_stats %>% filter(writer == "Brian May") %>% pull(ttr_median) %>% scales::number(accuracy = .01)`. Winner: **Brian May**.
 
 ```{r}
 lyrics_3 %>% 
