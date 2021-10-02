@@ -29,6 +29,15 @@ lyrics <- readRDS("./3_lyrics.Rds")
 lyrics_lines <- readRDS("./1_lyrics_lines.Rds")
 
 band_palette <- c("Queen" = "lightgoldenrod", "Rush" = "darkseagreen", "AC/DC" = "slategray1")
+writer_palette <- c(
+  "Queen" = "lightgoldenrod", 
+  "Brian May" = "lightsalmon",
+  "Freddie Mercury" = "thistle", 
+  "Roger Taylor" = "lavender",
+  "John Deacon" = "lightpink", 
+  "Neil Peart" = "darkseagreen", 
+  "AC/DC" = "slategray1"
+)
 ```
 
 > Section 4 of my [Battle of the Bands](https://mpfoley73.github.io/battle-of-the-bands/) text mining project compares recurring topics in songs by the writers from Queen, Rush, and AC/DC. Topic models identify dominant themes in text and are useful tools for summarizing large corposes. 
@@ -244,7 +253,7 @@ Let's look at Topic 2:
 stm::labelTopics(fit_prevalence, topics = 2)
 ```
 
-`findThoughts()` shows comments that mapped highly to the topic. I show the top 3 mappings below. Looking at the Highest Prob list, Peart's [Half the World](https://genius.com/Rush-half-the-world-lyrics) features *day*, *world*, and *half*; Peart's [Alien Shore](https://genius.com/Rush-alien-shore-lyrics) features just *world*, and ; May's [Some Day, One Day](https://genius.com/Queen-some-day-one-day-lyrics) features *day*, *hear*, and "son*. *word* and *son* appeared in none of these three songs.
+`findThoughts()` shows comments that mapped highly to the topic. I show the top 3 mappings below. Looking at the Highest Prob list, Peart's [Half the World](https://genius.com/Rush-half-the-world-lyrics) features *day*, *world*, and *half*; Peart's [Alien Shore](https://genius.com/Rush-alien-shore-lyrics) features just *world*, and ; May's [Some Day, One Day](https://genius.com/Queen-some-day-one-day-lyrics) features *day*, *hear*, and *son*. *word* and *call* appeared in none of these three songs.
 
 ```{r}
 topic_thoughts <- stm::findThoughts(
@@ -258,13 +267,102 @@ topic_thoughts <- stm::findThoughts(
 processed$meta[pluck(topic_thoughts$index, 1), ] %>% select(writer, song)
 ```
 
-For reporting purposes, you might want to sum each topic up with a title. That's not going to be useful here with `r `
+## Model Exploration
 
-**Topic 1** is ...
-**Topic 2** is...
-etc.
+For reporting purposes, you might want to sum each topic up with a title. That's not going to be useful here with `r fit_prevalence$theta %>% ncol()` topics. Instead, I'll use the top-5 *Highest Probability* words.
 
 ```{r}
+topic_lbl <- stm::labelTopics(fit_prevalence, n = 5) %>% 
+  pluck("prob") %>%
+  as.data.frame() %>%
+  mutate(
+    topic_num = row_number(),
+    topic_id = paste0("topic_", topic_num)
+  ) %>%
+  rowwise() %>%
+  mutate(
+    topic = paste(c(V1, V2, V3, V4, V5), collapse = ", "),
+    topic_long = paste0(topic_num, ": ", topic)
+  ) %>%
+  select(topic_id, topic, topic_long)
+
+topic_df <- fit_prevalence$theta %>% 
+  as.data.frame() 
+colnames(topic_df) <- topic_lbl$topic_id
+
+lyrics_tidy_2 <- processed$meta %>%
+  bind_cols(topic_df)
+```
+
+Data frame `lyrics_tidy_2` has the `r fit_prevalence$theta %>% ncol()` topic weights attached as columns with names topic_1, topic_2, ..., topic_`r fit_prevalence$theta %>% ncol()`. The topic descriptors are in data frame `topic_lbl` which I can use as a lookup after pivoting `lyrics_tidy_2`.
+
+```{r}
+lyrics_tidy_2_long <- lyrics_tidy_2 %>% 
+  pivot_longer(
+    cols = topic_1:topic_39, 
+    names_to = "topic_id", 
+    values_to = "topic_weight"
+  ) %>%
+  inner_join(topic_lbl, by = "topic_id") %>%
+  mutate(
+    topic = factor(topic, levels = topic_lbl$topic),
+    topic_long = factor(topic_long, levels = topic_lbl$topic_long)
+  ) 
+```
+
+Each song is a mix of topics, so for each song the topic weights sum to 1. 
+
+Topics usually make a negligible contribution to most songs, and a substantial contribution to a few songs. Viewed from the other side, most songs are composed primarily of one or two topics.
+
+```{r fig.height=8, fig.width=6}
+p <- lyrics_tidy_2_long %>%
+  ggplot(aes(x = fct_rev(topic_long), y = topic_weight, color = writer,
+             text = glue("song: {song} <br>",
+                         "topic: {topic} <br>",
+                         "weight: {scales::percent(topic_weight, accuracy = 1)}"))) +
+  geom_point(alpha = .8) +
+  scale_y_continuous(labels = scales::percent_format(accuracy = 1)) +
+  scale_color_manual(values = writer_palette) +
+  coord_flip() +
+  theme_light() +
+  labs(
+    title = "Topics usually make up <10% of a song",
+    subtitle = "Song Weights for each topic.",
+    x = NULL, y = "Topic Weight")
+ggplotly(p, tooltip = "text")
+```
+
+For example, in the plot above, topic, `r topic_lbl[39, ]$topic_long`, mapped highly to only a couple songs: `r lyrics_tidy_2_long %>% filter(song == "Was It All Worth It" & topic_id == "topic_39") %>% pull(topic_weight) %>% scales::percent(accuracy = 1)` for _Was it All Worth It_ and `r lyrics_tidy_2_long %>% filter(song == "Come and Get It" & topic_id == "topic_39") %>% pull(topic_weight) %>% scales::percent(accuracy = 1)`. _We Will Rock You_ was composed primarily of a single topic with a few other contributors.
+
+```{r}
+lyrics_tidy_2_long %>%
+  filter(song == "We Will Rock You") %>%
+  arrange(desc(topic_weight)) %>%
+  mutate(topic_weight = topic_weight * 100) %>%
+  head() %>%
+  select(topic, topic_weight) %>%
+  flextable::flextable() %>%
+  flextable::colformat_double(digits = 0, suffix = "%") %>%
+  flextable::autofit() %>%
+  flextable::set_caption("We Will Rock You topics")
+```
+
+## Similar Songs
+
+
+
+```{r}
+lyrics_tidy_2_long %>% 
+  group_by(song_id) %>% 
+  summarize(.groups = "drop", max_wt = max(topic_weight)) %>%
+  ggplot(aes(x = max_wt)) +
+  geom_histogram()
+
+lyrics_tidy_2_long %>% 
+  summarize(.groups = "drop", pct_lt10 = sum(topic_weight < .10) / n())
+  ggplot(aes(x = topic_weight)) +
+  geom_density()
+  summarize(gt10 = sum(if_else(topic_weight > .1, 1, 0)))
 
 ```
 
