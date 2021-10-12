@@ -350,6 +350,39 @@ lyrics_tidy_2_long %>%
   flextable::set_caption("We Will Rock You topics")
 ```
 
+A heat map of topic importance shows a higher topic concentration Deacon, Taylor, and Queen, but that is likely due to their small corpus sizes. Neil Peart weighed heavily on topic 15 (`r topic_lbl %>% filter(topic_id == "topic_15") %>% pull(topic)`) while other writers used it hardly at all. AC/DC relied on topic 32 (`r topic_lbl %>% filter(topic_id == "topic_32") %>% pull(topic)`), and so did Roger Taylor.
+
+```{r fig.height=8, fig.width=6}
+topic_importance <- lyrics_tidy_2_long %>%
+  group_by(writer, topic_long) %>%
+  summarize(
+    .groups = "drop",
+    songs = n(),
+    important = sum(topic_weight >= .25),
+    pct_import = important / songs)
+
+topic_importance %>%
+  ggplot(aes(x = writer, y = topic_long, label = pct_import)) +
+  geom_tile(aes(fill = pct_import)) +
+  scale_fill_gradient(low = "#FFFFFF", high = "goldenrod") +
+  scale_x_discrete(labels = function(x) str_wrap(x, width = 8)) +
+  theme_light() +
+  theme(legend.position = "top") +
+  labs(title = "Topic Importance by Writer", fill = NULL, y = NULL, x = NULL)
+```
+
+Which writers were most similar? Topic weights for AC/DC were highly correlated with Roger Taylor, but negatively correlated with the other writers, especially Neil Peart. Peart was no correlated with anyone. The most similar writers were Brian May and Freddie Mercury. John Deacon was in between, correlated less strongly to both Mercury and May.
+
+```{r}
+topic_importance %>% 
+  select(writer, topic_long, pct_import) %>%
+  pivot_wider(names_from = writer, values_from = pct_import) %>%
+  column_to_rownames(var = "topic_long") %>%
+  cor() %>%
+  corrplot::corrplot(type = "upper")
+cor(topic_importance %>% select(writer, topic_long, pct_import))
+```
+
 ## Similar Songs
 
 A cluster analysis can use the topics to find similar songs. I'll follow the steps from my [unsupervised learning handbook](https://bookdown.org/mpfoley1973/unsupervised-ml/cluster-analysis.html) chapter on K-mediods cluster analysis.
@@ -432,4 +465,6 @@ Save the lyrics with complexity stats for subsequent steps.
 
 ```{r}
 saveRDS(lyrics_tidy_3, "./4_lyrics.Rds")
+saveRDS(fit_prevalence, "./4_model.Rds")
+saveRDS(lyrics_tidy_2_long, "./4_lyrics_long.Rds")
 ```
