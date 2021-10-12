@@ -380,7 +380,6 @@ topic_importance %>%
   column_to_rownames(var = "topic_long") %>%
   cor() %>%
   corrplot::corrplot(type = "upper")
-cor(topic_importance %>% select(writer, topic_long, pct_import))
 ```
 
 ## Similar Songs
